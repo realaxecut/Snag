@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Win32;
 
 namespace Snag.Services;
 
@@ -106,7 +107,7 @@ public static partial class AppUpdater
             var psi = new ProcessStartInfo(path)
             {
                 UseShellExecute = true, // lets Windows show its permission prompt
-                Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH",
+                Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH" + (IsPerUserInstall() ? " /CURRENTUSER" : ""),
             };
             using var _ = Process.Start(psi);
             Log.Info($"Started the installer for an update: {path}");
@@ -114,6 +115,26 @@ public static partial class AppUpdater
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED: permission refused
         {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// True when this copy was installed just for the current user (installer run with /CURRENTUSER, no admin),
+    /// so its update must be too. The installer records where it put Snag under this key (AppId + "_is1").
+    /// </summary>
+    private static bool IsPerUserInstall()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{BF0867FE-5A71-418D-8A9B-9F0F45975ACC}_is1");
+            return key?.GetValue("InstallLocation") is string location &&
+                   Path.TrimEndingDirectorySeparator(Path.GetFullPath(location))
+                       .Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(AppContext.BaseDirectory)), StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Couldn't read Snag's install record", ex);
             return false;
         }
     }
