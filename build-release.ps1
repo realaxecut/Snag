@@ -15,6 +15,14 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $repo = 'realaxecut/Snag'
 
+# Windows PowerShell 5.1 turns anything a tool writes to stderr (git's normal progress, for one) into a
+# fatal error under 'Stop', so these run with that relaxed and are judged by their exit code instead.
+function Invoke-Native([scriptblock]$command, [string]$failure) {
+    $ErrorActionPreference = 'Continue'
+    & $command 2>&1 | ForEach-Object { "$_" }
+    if ($LASTEXITCODE) { throw $failure }
+}
+
 [xml]$project = Get-Content 'Snag\Snag.csproj'
 $version = @($project.Project.PropertyGroup.Version | Where-Object { $_ })[0]
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Snag.csproj needs a <Version> like 1.2.3 (found '$version')." }
@@ -52,10 +60,9 @@ Set-Content dist\SHA256SUMS.txt "$hash  $setup" -Encoding ascii
 Write-Host "Built dist\$setup ($([math]::Round((Get-Item "dist\$setup").Length / 1MB, 1)) MB)"
 
 if ($Publish) {
-    git push origin HEAD
-    if ($LASTEXITCODE) { throw 'git push failed.' }
+    Invoke-Native { git push origin HEAD } 'git push failed.'
     if (-not $Notes) { $Notes = "Snag $version" }
-    gh release create "v$version" "dist\$setup" dist\SHA256SUMS.txt --repo $repo --target (git rev-parse HEAD) --title "Snag $version" --notes $Notes
-    if ($LASTEXITCODE) { throw 'Creating the GitHub release failed.' }
+    $commit = git rev-parse HEAD
+    Invoke-Native { gh release create "v$version" "dist\$setup" dist\SHA256SUMS.txt --repo $repo --target $commit --title "Snag $version" --notes $Notes } 'Creating the GitHub release failed.'
     Write-Host "Released: https://github.com/$repo/releases/tag/v$version"
 }
