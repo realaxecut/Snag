@@ -28,7 +28,9 @@ if (-not $iscc) { throw 'Inno Setup 6 is needed: winget install JRSoftware.InnoS
 
 if ($Publish) {
     if (git status --porcelain) { throw 'Commit your changes before publishing a release.' }
-    if (gh release view "v$version" --repo $repo 2>$null) { throw "v$version is already released. Bump <Version> in Snag\Snag.csproj first." }
+    $released = @(gh release list --repo $repo --limit 1000 --json tagName --jq '.[].tagName')
+    if ($LASTEXITCODE) { throw "Couldn't read the releases of $repo. Is the GitHub CLI signed in (gh auth login)?" }
+    if ($released -contains "v$version") { throw "v$version is already released. Bump <Version> in Snag\Snag.csproj first." }
 }
 
 Write-Host "Building Snag $version..."
