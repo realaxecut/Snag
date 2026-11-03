@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Snag</AssemblyName>
     <RootNamespace>Snag</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Product>Snag</Product>
     <Description>A clean, safe yt-dlp front end with a built-in player.</Description>
     <ApplicationIcon>Assets\snag.ico</ApplicationIcon>

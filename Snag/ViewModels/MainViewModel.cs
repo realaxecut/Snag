@@ -174,6 +174,7 @@ public sealed class MainViewModel : ObservableObject
         PlayHistoryCommand = new RelayCommand<HistoryItemViewModel>(PlayHistory, h => h.Exists);
         AddHistoryToPlaylistCommand = new RelayCommand<HistoryItemViewModel>(AddHistoryToPlaylist, h => h.Exists);
         ShowHistoryCommand = new RelayCommand<HistoryItemViewModel>(h => PowerActions.ShowInExplorer(h.Exists ? h.FilePath : Path.GetDirectoryName(h.FilePath) ?? ""));
+        CopyHistoryLinkCommand = new RelayCommand<HistoryItemViewModel>(CopyHistoryLink, h => h.HasLink);
         DeleteHistoryCommand = new RelayCommand<HistoryItemViewModel>(DeleteHistory);
         ClearHistoryCommand = new RelayCommand(ClearHistory, () => History.Count > 0);
 
@@ -229,6 +230,7 @@ public sealed class MainViewModel : ObservableObject
     public ICommand PlayHistoryCommand { get; }
     public ICommand AddHistoryToPlaylistCommand { get; }
     public ICommand ShowHistoryCommand { get; }
+    public ICommand CopyHistoryLinkCommand { get; }
     public ICommand DeleteHistoryCommand { get; }
     public ICommand ClearHistoryCommand { get; }
 
@@ -1249,6 +1251,31 @@ public sealed class MainViewModel : ObservableObject
             DownloadedUtc = DateTime.UtcNow,
         }));
         SaveHistory();
+    }
+
+    private void CopyHistoryLink(HistoryItemViewModel item)
+    {
+        if (item.Link is not { } link) return;
+        // Another app can be holding the clipboard for a moment, so try a few times.
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                Clipboard.SetText(link);
+                ShowToast("Link copied");
+                return;
+            }
+            catch (System.Runtime.InteropServices.COMException) when (attempt < 4)
+            {
+                Thread.Sleep(50);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Couldn't copy a link", ex);
+                ShowToast("Couldn't copy the link. Try again.");
+                return;
+            }
+        }
     }
 
     private void PlayHistory(HistoryItemViewModel item)

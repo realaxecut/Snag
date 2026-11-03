@@ -46,7 +46,8 @@ Snag checks this repository for a new release each time it starts (**Settings â†
   - Repeat and this switch turn each other off, since a repeating playlist never ends.
 
 **History**
-- Every finished download, with search, play, add to the playlist, and show in folder.
+- Every finished download, with search (by title, file or link), play, add to the playlist, and show in folder.
+- **Copy link** copies the video, Short or post's link, even if you've since deleted the file.
 - **Delete** removes the video from your computer. It asks first, then moves the file to the **Recycle Bin**, so you can still restore it. It's also removed from the player.
 
 **Themes** (Settings â†’ Appearance)

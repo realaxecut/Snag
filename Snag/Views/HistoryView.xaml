@@ -81,6 +81,8 @@
                                             Command="{Binding DataContext.PlayHistoryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" />
                                     <Button x:Name="QueueButton" Style="{StaticResource IconButton}" Content="&#xE710;" ToolTip="Add to the player's playlist"
                                             Command="{Binding DataContext.AddHistoryToPlaylistCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" />
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE71B;" ToolTip="Copy link"
+                                            Command="{Binding DataContext.CopyHistoryLinkCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" />
                                     <Button Style="{StaticResource IconButton}" Content="&#xE8B7;" ToolTip="Show in folder"
                                             Command="{Binding DataContext.ShowHistoryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" />
                                     <Button x:Name="DeleteButton" Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Delete from your computer (moves it to the Recycle Bin)"

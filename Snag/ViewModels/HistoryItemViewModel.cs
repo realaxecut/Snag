@@ -11,6 +11,10 @@ public sealed class HistoryItemViewModel(HistoryEntry entry) : ObservableObject
     public string Badge => Entry.Badge;
     public bool IsAudio => Entry.IsAudio;
 
+    /// <summary>The video, Short or post's own page, cleaned up; null if the entry was saved without one.</summary>
+    public string? Link { get; } = UrlGuard.CleanPageUrl(entry.SourceUrl);
+    public bool HasLink => Link is not null;
+
     public string Details
     {
         get
@@ -35,5 +39,6 @@ public sealed class HistoryItemViewModel(HistoryEntry entry) : ObservableObject
     public bool Matches(string query) =>
         query.Length == 0 ||
         Entry.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
-        Entry.FilePath.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+        Entry.FilePath.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+        (Link?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
 }
