@@ -63,6 +63,14 @@ if ($Publish) {
     Invoke-Native { git push origin HEAD } 'git push failed.'
     if (-not $Notes) { $Notes = "Snag $version" }
     $commit = git rev-parse HEAD
-    Invoke-Native { gh release create "v$version" "dist\$setup" dist\SHA256SUMS.txt --repo $repo --target $commit --title "Snag $version" --notes $Notes } 'Creating the GitHub release failed.'
+    # The notes go in a file: Windows PowerShell 5.1 mangles quotes inside arguments it passes to other programs.
+    $notesFile = Join-Path $env:TEMP "snag-release-notes-$version.md"
+    [IO.File]::WriteAllText($notesFile, $Notes)
+    try {
+        Invoke-Native { gh release create "v$version" "dist\$setup" dist\SHA256SUMS.txt --repo $repo --target $commit --title "Snag $version" --notes-file $notesFile } 'Creating the GitHub release failed.'
+    }
+    finally {
+        Remove-Item $notesFile -ErrorAction SilentlyContinue
+    }
     Write-Host "Released: https://github.com/$repo/releases/tag/v$version"
 }
