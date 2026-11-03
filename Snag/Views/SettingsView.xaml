@@ -14,12 +14,12 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="44" Height="44" CornerRadius="12" Background="{StaticResource BrandGradient}">
+                        <Border Width="44" Height="44" CornerRadius="12" Background="{DynamicResource BrandGradient}">
                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="18" Foreground="White" HorizontalAlignment="Center" />
                         </Border>
                         <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
                             <TextBlock Text="{Binding AppVersionText}" FontSize="16" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding AppUpdateStatus}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,3,0,0" />
+                            <TextBlock Text="{Binding AppUpdateStatus}" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,3,0,0" />
                         </StackPanel>
                         <Grid Grid.Column="2" VerticalAlignment="Center">
                             <Button Style="{StaticResource GhostButton}" Command="{Binding CheckAppUpdateCommand}"
@@ -41,16 +41,16 @@
 
                     <StackPanel Margin="0,16,0,0" Visibility="{Binding AppUpdateDownloading, Converter={StaticResource Vis}}">
                         <Grid>
-                            <TextBlock Text="{Binding AppUpdateProgress, StringFormat={}{0:0}%}" FontSize="12.5" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding AppUpdateProgress, StringFormat={}{0:0}%}" FontSize="12.5" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
                             <Button Style="{StaticResource GhostButton}" Height="28" Content="Cancel" HorizontalAlignment="Right" Command="{Binding CancelAppUpdateCommand}" />
                         </Grid>
                         <ProgressBar Style="{StaticResource SlimProgress}" Margin="0,8,0,0" Value="{Binding AppUpdateProgress, Mode=OneWay}" />
                     </StackPanel>
-                    <TextBlock Text="{Binding AppUpdateError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,12,0,0"
+                    <TextBlock Text="{Binding AppUpdateError}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,12,0,0"
                                Visibility="{Binding AppUpdateError, Converter={StaticResource Vis}}" />
 
                     <!-- What's new in the available version -->
-                    <Border Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" CornerRadius="10"
+                    <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="10"
                             Padding="16,12" Margin="0,16,0,0" Visibility="{Binding HasAppUpdate, Converter={StaticResource Vis}}">
                         <StackPanel>
                             <DockPanel>
@@ -79,6 +79,194 @@
                 </StackPanel>
             </Border>
 
+            <!-- ============ Appearance ============ -->
+            <Border Style="{StaticResource Card}" Padding="24" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="Appearance" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,5,0,0" Text="Every colour comes in light and dark. Auto follows Windows' light or dark mode." />
+
+                    <TextBlock Text="MODE" Style="{StaticResource Label}" Margin="0,18,0,8" />
+                    <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="11" Padding="3"
+                            Width="330" HorizontalAlignment="Left">
+                        <UniformGrid Columns="3">
+                            <RadioButton Style="{StaticResource Segment}" IsChecked="{Binding Appearance, Converter={StaticResource Is}, ConverterParameter=Auto}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F4;" />
+                                    <TextBlock Text="Auto" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource Segment}" IsChecked="{Binding Appearance, Converter={StaticResource Is}, ConverterParameter=Light}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE706;" />
+                                    <TextBlock Text="Light" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource Segment}" IsChecked="{Binding Appearance, Converter={StaticResource Is}, ConverterParameter=Dark}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE708;" />
+                                    <TextBlock Text="Dark" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </RadioButton>
+                        </UniformGrid>
+                    </Border>
+
+                    <TextBlock Text="COLOUR" Style="{StaticResource Label}" Margin="0,18,0,2" />
+                    <ListBox ItemsSource="{Binding ThemeSwatches}" SelectedItem="{Binding SelectedTheme}" Margin="-6,0,-6,0"
+                             Background="Transparent" BorderThickness="0" Focusable="False"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Theme">
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="ListBox">
+                                <ItemsPresenter />
+                            </ControlTemplate>
+                        </ListBox.Template>
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <StackPanel Margin="6" Width="104">
+                                                <Border x:Name="Ring" CornerRadius="13" BorderThickness="2" BorderBrush="Transparent" Padding="3">
+                                                    <Border Height="64" CornerRadius="10" Background="{Binding Window}"
+                                                            BorderBrush="#26808080" BorderThickness="1" ClipToBounds="True">
+                                                        <Grid Margin="9">
+                                                            <Border Width="30" Height="9" CornerRadius="4.5" Background="{Binding Accent}"
+                                                                    HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                                            <Ellipse Width="9" Height="9" Fill="{Binding Accent}" HorizontalAlignment="Right" VerticalAlignment="Top" />
+                                                            <Border Height="24" CornerRadius="5" Background="{Binding Surface}" VerticalAlignment="Bottom"
+                                                                    BorderBrush="#1F808080" BorderThickness="1" />
+                                                            <!-- "Custom": a pencil badge says this one is yours to edit -->
+                                                            <Border Width="22" Height="22" CornerRadius="11" Background="{Binding Accent}" Margin="0,0,4,1"
+                                                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                                    Visibility="{Binding IsCustom, Converter={StaticResource Vis}}">
+                                                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE70F;" FontSize="11" Foreground="White" HorizontalAlignment="Center" />
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
+                                                </Border>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                                    <TextBlock x:Name="Check" Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="10"
+                                                               Foreground="{DynamicResource BrandBrush}" Margin="0,0,5,0" Visibility="Collapsed" />
+                                                    <TextBlock x:Name="Label" Text="{Binding Name}" FontSize="12.5" Foreground="{DynamicResource MutedBrush}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource BrandGradient}" />
+                                                    <Setter TargetName="Check" Property="Visibility" Value="Visible" />
+                                                    <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
+                                                    <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                    </ListBox>
+
+                    <!-- A saved preset is selected -->
+                    <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="12"
+                            Padding="16,10" Margin="0,12,0,0" Visibility="{Binding IsPresetTheme, Converter={StaticResource Vis}}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Height="30" Margin="8,0,0,0" Command="{Binding DeleteThemePresetCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" FontSize="12" />
+                                    <TextBlock Text="Delete" Margin="7,0,0,0" FontSize="12.5" />
+                                </StackPanel>
+                            </Button>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Height="30" Command="{Binding EditThemePresetCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE70F;" FontSize="12" />
+                                    <TextBlock Text="Edit" Margin="7,0,0,0" FontSize="12.5" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock VerticalAlignment="Center" FontSize="13">
+                                <Run Text="Your preset: " Foreground="{DynamicResource MutedBrush}" /><Run Text="{Binding SelectedPresetText, Mode=OneWay}" FontWeight="SemiBold" />
+                            </TextBlock>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Custom colour editor -->
+                    <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="12"
+                            Padding="18,16" Margin="0,12,0,0" Visibility="{Binding IsCustomTheme, Converter={StaticResource Vis}}">
+                        <StackPanel>
+                            <TextBlock Text="YOUR COLOUR" Style="{StaticResource Label}" Margin="0,0,0,10" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Width="34" Height="34" Fill="{Binding CustomAccentBrush}" Stroke="{DynamicResource StrokeBrush}" StrokeThickness="1" />
+                                <Slider Grid.Column="1" Style="{StaticResource HueSlider}" Margin="12,0" VerticalAlignment="Center"
+                                        Value="{Binding CustomHue}" AutomationProperties.Name="Hue" />
+                                <TextBox Grid.Column="2" Width="104" Height="34" VerticalContentAlignment="Center" FontFamily="Consolas" FontSize="13"
+                                         Text="{Binding CustomAccentText, UpdateSourceTrigger=PropertyChanged}" MaxLength="7"
+                                         ToolTip="Any colour as #RRGGBB" AutomationProperties.Name="Colour code" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding QuickColors}" Margin="44,12,0,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource ColorDot}" Background="{Binding}" ToolTip="{Binding}" AutomationProperties.Name="{Binding}"
+                                                Command="{Binding DataContext.PickCustomColorCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CustomTint}" Margin="0,8,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Tint the background" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0"
+                                               Text="Gives the window and cards a faint shade of your colour. Off keeps them neutral grey or white." />
+                                </StackPanel>
+                            </CheckBox>
+
+                            <TextBlock Text="SAVE AS A PRESET" Style="{StaticResource Label}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <TextBox x:Name="PresetName" Text="{Binding CustomPresetName, UpdateSourceTrigger=PropertyChanged}" Height="36" MaxLength="30"
+                                             VerticalContentAlignment="Center" AutomationProperties.Name="Preset name">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Return" Command="{Binding SaveThemePresetCommand}" />
+                                        </TextBox.InputBindings>
+                                    </TextBox>
+                                    <TextBlock Text="Name it, e.g. Midnight blue" Foreground="{DynamicResource FaintBrush}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                               IsHitTestVisible="False" Visibility="{Binding CustomPresetName, Converter={StaticResource Vis}, ConverterParameter=!}" />
+                                </Grid>
+                                <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Height="36" FontSize="13" Margin="10,0,0,0" Command="{Binding SaveThemePresetCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE74E;" />
+                                        <TextBlock Text="Save preset" Margin="8,0,0,0" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="2,8,0,0"
+                                       Text="A preset remembers this colour, the tint and whether it's light or dark, and appears with the other colours above." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
             <!-- ============ Download engine ============ -->
             <Border Style="{StaticResource Card}" Padding="24" Margin="0,16,0,0">
                 <StackPanel>
@@ -89,23 +277,23 @@
                     <ItemsControl ItemsSource="{Binding ToolRows}" Margin="0,16,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="0,12">
+                                <Border BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="0,12">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Border Width="38" Height="38" CornerRadius="10" Background="{StaticResource ChipBrush}">
+                                        <Border Width="38" Height="38" CornerRadius="10" Background="{DynamicResource ChipBrush}">
                                             <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" HorizontalAlignment="Center" />
                                         </Border>
                                         <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13.5" />
-                                            <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,2,0,0" />
                                         </StackPanel>
                                         <Border Grid.Column="2" Style="{StaticResource Chip}" Margin="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock x:Name="StateGlyph" Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="11" Foreground="{StaticResource SuccessBrush}" />
+                                                <TextBlock x:Name="StateGlyph" Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
                                                 <TextBlock Text="{Binding Version}" FontSize="12" Margin="7,0,0,0" />
                                             </StackPanel>
                                         </Border>
@@ -114,7 +302,7 @@
                                 <DataTemplate.Triggers>
                                     <DataTrigger Binding="{Binding Installed}" Value="False">
                                         <Setter TargetName="StateGlyph" Property="Text" Value="&#xE783;" />
-                                        <Setter TargetName="StateGlyph" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                        <Setter TargetName="StateGlyph" Property="Foreground" Value="{DynamicResource DangerBrush}" />
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -124,11 +312,11 @@
                     <StackPanel Margin="0,6,0,0" Visibility="{Binding ToolsBusy, Converter={StaticResource Vis}}">
                         <Grid>
                             <TextBlock Text="{Binding ToolsStatus}" FontSize="12.5" />
-                            <TextBlock Text="{Binding ToolsProgress, StringFormat={}{0:0}%}" FontSize="12.5" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+                            <TextBlock Text="{Binding ToolsProgress, StringFormat={}{0:0}%}" FontSize="12.5" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" />
                         </Grid>
                         <ProgressBar Style="{StaticResource SlimProgress}" Margin="0,8,0,0" Value="{Binding ToolsProgress, Mode=OneWay}" />
                     </StackPanel>
-                    <TextBlock Text="{Binding ToolsError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                    <TextBlock Text="{Binding ToolsError}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
                                Visibility="{Binding ToolsError, Converter={StaticResource Vis}}" />
 
                     <WrapPanel Margin="0,16,0,0">
@@ -176,10 +364,10 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+                        <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                                 CornerRadius="8" Padding="12,0" Height="38">
                             <DockPanel>
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" Foreground="{StaticResource MutedBrush}" />
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" Foreground="{DynamicResource MutedBrush}" />
                                 <TextBlock Text="{Binding OutputFolder}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="12.5" />
                             </DockPanel>
                         </Border>
@@ -211,6 +399,13 @@
                             <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" Text="Each one is added to the end of the player's playlist." />
                         </StackPanel>
                     </CheckBox>
+                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding UseOptionsPopup}" Margin="0,18,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Show download options in a pop-up" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0"
+                                       Text="After you fetch a link, the video and its MP4/MP3 options open in a window over the blurred app, instead of in the panel beside it." />
+                        </StackPanel>
+                    </CheckBox>
                 </StackPanel>
             </Border>
 
@@ -218,7 +413,7 @@
             <Border Style="{StaticResource Card}" Padding="24" Margin="0,16,0,0">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEA18;" FontSize="16" Foreground="{StaticResource BrandBrush}" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEA18;" FontSize="16" Foreground="{DynamicResource BrandBrush}" />
                         <TextBlock Text="Privacy &amp; safety" FontSize="16" FontWeight="SemiBold" Margin="10,0,0,0" />
                     </StackPanel>
                     <ItemsControl Margin="0,14,0,0">
@@ -229,7 +424,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="11" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Top" Margin="0,3,0,0" />
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="11" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Top" Margin="0,3,0,0" />
                                     <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" FontSize="12.5" Margin="12,0,0,0" />
                                 </Grid>
                             </DataTemplate>
@@ -249,7 +444,7 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Foreground="{StaticResource FaintBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,20,0,0">
+            <TextBlock Foreground="{DynamicResource FaintBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,20,0,0">
                 <Run Text="{Binding AppVersionText, Mode=OneWay}" /><Run Text="  ·  a yt-dlp front end" />
             </TextBlock>
         </StackPanel>

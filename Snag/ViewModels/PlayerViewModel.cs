@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Windows.Input;
 using Snag.Services;
 
@@ -39,7 +40,9 @@ public sealed class PlaylistItem : ObservableObject
 
     public string Path { get; }
     public string Title { get; }
-    public string? ArtworkUrl { get; }
+
+    /// <summary>The download's thumbnail, or (for files from the PC) a frame from the video or the song's cover art.</summary>
+    public string? ArtworkUrl { get; set => Set(ref field, value); }
     public bool IsAudio { get; }
     public string Kind { get; }
 
@@ -88,9 +91,14 @@ public sealed class PlayerViewModel : ObservableObject
         foreach (var entry in saved.Where(e => !string.IsNullOrWhiteSpace(e.Path)))
             Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !File.Exists(entry.Path) });
         Renumber();
+        foreach (var item in Items) _ = EnsureArtworkAsync(item);
 
-        Items.CollectionChanged += (_, _) =>
+        Items.CollectionChanged += (_, e) =>
         {
+            if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems is not null)
+            {
+                foreach (PlaylistItem item in e.NewItems) _ = EnsureArtworkAsync(item);
+            }
             Renumber();
             OnPropertyChanged(nameof(Count));
             OnPropertyChanged(nameof(PositionText));
@@ -258,6 +266,20 @@ public sealed class PlayerViewModel : ObservableObject
         var item = new PlaylistItem(path, title, artworkUrl);
         Items.Add(item);
         return item;
+    }
+
+    /// <summary>
+    /// Files from the PC have no thumbnail: give them a frame from halfway through the video (or the song's
+    /// cover art) instead of a placeholder. Also redoes pictures whose cached file has gone.
+    /// </summary>
+    private async Task EnsureArtworkAsync(PlaylistItem item)
+    {
+        if (item.Missing) return;
+        if (item.ArtworkUrl is { } art && !(ThumbnailCache.IsCachedPath(art) && !File.Exists(art))) return;
+        var picture = await FrameGrabber.GetAsync(item.Path, item.IsAudio);
+        if (picture is null || !Items.Contains(item)) return;
+        item.ArtworkUrl = picture;
+        _changed(); // remembered with the playlist
     }
 
     public void PlayItem(PlaylistItem item) => PlayItem(item, rememberPrevious: true);

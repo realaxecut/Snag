@@ -8,7 +8,10 @@
 
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-    <!-- Brand -->
+    <!--
+        Theme colours. These are the Dark theme's values; Services\ThemeManager.cs replaces every one of
+        them in the application's resources when the theme changes, so always use them as DynamicResource.
+    -->
     <LinearGradientBrush x:Key="BrandGradient" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#7C5CFF" Offset="0" />
         <GradientStop Color="#C04BF2" Offset="1" />
@@ -19,17 +22,33 @@
     </LinearGradientBrush>
     <SolidColorBrush x:Key="BrandBrush" Color="#A48BFF" />
     <SolidColorBrush x:Key="BrandSoftBrush" Color="#2E8B6CFF" />
+    <SolidColorBrush x:Key="SelectedBrush" Color="#248B6CFF" />
+    <SolidColorBrush x:Key="HaloBrush" Color="#33A48BFF" />
     <SolidColorBrush x:Key="DangerBrush" Color="#FF8080" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#5EE08F" />
+    <SolidColorBrush x:Key="StrongTextBrush" Color="White" />
     <SolidColorBrush x:Key="MutedBrush" Color="#A9A9B8" />
     <SolidColorBrush x:Key="FaintBrush" Color="#7A7A8E" />
     <SolidColorBrush x:Key="HoverBrush" Color="#14FFFFFF" />
     <SolidColorBrush x:Key="PressedBrush" Color="#0AFFFFFF" />
+    <SolidColorBrush x:Key="ControlHoverBrush" Color="#1FFFFFFF" />
+    <SolidColorBrush x:Key="ControlPressedBrush" Color="#0DFFFFFF" />
+    <SolidColorBrush x:Key="NavCheckedBrush" Color="#24FFFFFF" />
     <SolidColorBrush x:Key="TileBrush" Color="#1AFFFFFF" />
     <SolidColorBrush x:Key="StrokeBrush" Color="#1FFFFFFF" />
     <SolidColorBrush x:Key="ChipBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="TrackBrush" Color="#1FFFFFFF" />
+    <SolidColorBrush x:Key="SliderTrackBrush" Color="#2EFFFFFF" />
+    <SolidColorBrush x:Key="SwitchBorderBrush" Color="#8CFFFFFF" />
+    <SolidColorBrush x:Key="SwitchBorderHoverBrush" Color="#CCFFFFFF" />
+    <SolidColorBrush x:Key="SwitchFillBrush" Color="#0AFFFFFF" />
+    <SolidColorBrush x:Key="SwitchKnobBrush" Color="#D9FFFFFF" />
+    <SolidColorBrush x:Key="KnobStrokeBrush" Color="Transparent" />
     <SolidColorBrush x:Key="ScrimBrush" Color="#B8000000" />
+    <SolidColorBrush x:Key="OverlayBrush" Color="#C8101015" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="#FF24242C" />
+    <SolidColorBrush x:Key="ToastBrush" Color="#F2303040" />
+    <SolidColorBrush x:Key="WindowBrush" Color="#202020" />
 
     <!-- Text -->
     <Style x:Key="Glyph" TargetType="TextBlock">
@@ -41,12 +60,12 @@
     <Style x:Key="Label" TargetType="TextBlock">
         <Setter Property="FontSize" Value="11.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         <Setter Property="Margin" Value="0,20,0,8" />
     </Style>
 
     <Style x:Key="Muted" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
@@ -61,8 +80,8 @@
     </Style>
 
     <Style x:Key="Chip" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource ChipBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="7" />
         <Setter Property="Padding" Value="9,4" />
@@ -70,7 +89,7 @@
     </Style>
 
     <Style x:Key="CountBadge" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource BrandGradient}" />
+        <Setter Property="Background" Value="{DynamicResource BrandGradient}" />
         <Setter Property="CornerRadius" Value="9" />
         <Setter Property="MinWidth" Value="18" />
         <Setter Property="Height" Value="18" />
@@ -97,10 +116,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressedBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PressedBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.35" />
@@ -113,8 +132,8 @@
 
     <Style x:Key="GhostButton" TargetType="Button">
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-        <Setter Property="Background" Value="{StaticResource ChipBrush}" />
-        <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="14,0" />
         <Setter Property="Height" Value="34" />
@@ -129,10 +148,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#1FFFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#0DFFFFFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlPressedBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4" />
@@ -154,7 +173,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid>
-                        <Border Background="{StaticResource BrandGradientHorizontal}" CornerRadius="10" />
+                        <Border Background="{DynamicResource BrandGradientHorizontal}" CornerRadius="10" />
                         <Border x:Name="Shine" Background="White" CornerRadius="10" Opacity="0" />
                         <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
@@ -186,7 +205,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid>
-                        <Ellipse Fill="{StaticResource BrandGradient}" />
+                        <Ellipse Fill="{DynamicResource BrandGradient}" />
                         <Ellipse x:Name="Shine" Fill="White" Opacity="0" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
@@ -206,9 +225,20 @@
         </Setter>
     </Style>
 
+    <!-- Picker rows that can be greyed out (e.g. a resolution the chosen codec doesn't come in) -->
+    <Style x:Key="OptionItem" TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+        <Setter Property="IsEnabled" Value="{Binding IsEnabled}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.4" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Top navigation pills -->
     <Style x:Key="NavPill" TargetType="RadioButton">
-        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         <Setter Property="FontSize" Value="13.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Height" Value="34" />
@@ -222,11 +252,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="White" />
+                            <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#24FFFFFF" />
-                            <Setter Property="Foreground" Value="White" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavCheckedBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -236,7 +266,7 @@
 
     <!-- Segmented control (MP4 / MP3) -->
     <Style x:Key="Segment" TargetType="RadioButton">
-        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Height" Value="38" />
@@ -249,10 +279,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Foreground" Value="White" />
+                            <Setter Property="Foreground" Value="{DynamicResource StrongTextBrush}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BrandGradientHorizontal}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrandGradientHorizontal}" />
                             <Setter Property="Foreground" Value="White" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -275,20 +305,20 @@
                         </Grid.ColumnDefinitions>
                         <ContentPresenter VerticalAlignment="Center" Margin="0,0,14,0" />
                         <Border x:Name="Track" Grid.Column="1" Width="40" Height="20" CornerRadius="10" BorderThickness="1"
-                                BorderBrush="#8CFFFFFF" Background="#0AFFFFFF" VerticalAlignment="Center">
-                            <Ellipse x:Name="Knob" Width="12" Height="12" Fill="#D9FFFFFF" HorizontalAlignment="Left" Margin="4,0,0,0" />
+                                BorderBrush="{DynamicResource SwitchBorderBrush}" Background="{DynamicResource SwitchFillBrush}" VerticalAlignment="Center">
+                            <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{DynamicResource SwitchKnobBrush}" HorizontalAlignment="Left" Margin="4,0,0,0" />
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Track" Property="Background" Value="{StaticResource BrandGradientHorizontal}" />
+                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource BrandGradientHorizontal}" />
                             <Setter TargetName="Track" Property="BorderBrush" Value="Transparent" />
                             <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
                             <Setter TargetName="Knob" Property="Margin" Value="0,0,4,0" />
                             <Setter TargetName="Knob" Property="Fill" Value="White" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Track" Property="BorderBrush" Value="#CCFFFFFF" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource SwitchBorderHoverBrush}" />
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
@@ -343,7 +373,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -365,10 +395,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#248B6CFF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectedBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -379,25 +409,26 @@
     <!-- Thin progress bar with an animated sweep for "working on it" -->
     <Style x:Key="SlimProgress" TargetType="ProgressBar">
         <Setter Property="Height" Value="4" />
-        <Setter Property="Foreground" Value="{StaticResource BrandGradientHorizontal}" />
-        <Setter Property="Background" Value="#1FFFFFFF" />
+        <Setter Property="Foreground" Value="{DynamicResource BrandGradientHorizontal}" />
+        <Setter Property="Background" Value="{DynamicResource TrackBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ProgressBar">
                     <Grid ClipToBounds="True">
                         <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="2" />
                         <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="2" HorizontalAlignment="Left" />
-                        <Border x:Name="Sweep" CornerRadius="2" Visibility="Collapsed">
-                            <Border.Background>
+                        <!-- The theme's gradient, seen through a soft moving window -->
+                        <Border x:Name="Sweep" CornerRadius="2" Visibility="Collapsed" Background="{TemplateBinding Foreground}">
+                            <Border.OpacityMask>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                     <LinearGradientBrush.RelativeTransform>
                                         <TranslateTransform X="-1" />
                                     </LinearGradientBrush.RelativeTransform>
-                                    <GradientStop Color="#007C5CFF" Offset="0.15" />
-                                    <GradientStop Color="#FFA98CFF" Offset="0.5" />
-                                    <GradientStop Color="#00C04BF2" Offset="0.85" />
+                                    <GradientStop Color="#00000000" Offset="0.15" />
+                                    <GradientStop Color="#FF000000" Offset="0.5" />
+                                    <GradientStop Color="#00000000" Offset="0.85" />
                                 </LinearGradientBrush>
-                            </Border.Background>
+                            </Border.OpacityMask>
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -408,7 +439,7 @@
                                 <BeginStoryboard x:Name="SweepAnimation">
                                     <Storyboard RepeatBehavior="Forever">
                                         <DoubleAnimation Storyboard.TargetName="Sweep"
-                                                         Storyboard.TargetProperty="(Border.Background).(Brush.RelativeTransform).(TranslateTransform.X)"
+                                                         Storyboard.TargetProperty="(Border.OpacityMask).(Brush.RelativeTransform).(TranslateTransform.X)"
                                                          From="-1" To="1" Duration="0:0:1.4" />
                                     </Storyboard>
                                 </BeginStoryboard>
@@ -448,9 +479,9 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Grid Background="Transparent">
-                        <Ellipse x:Name="Halo" Fill="#33A48BFF" Margin="-4" Opacity="0" />
-                        <Ellipse Fill="White" />
-                        <Ellipse x:Name="Dot" Fill="{StaticResource BrandBrush}" Margin="5" />
+                        <Ellipse x:Name="Halo" Fill="{DynamicResource HaloBrush}" Margin="-4" Opacity="0" />
+                        <Ellipse Fill="White" Stroke="{DynamicResource KnobStrokeBrush}" StrokeThickness="1" />
+                        <Ellipse x:Name="Dot" Fill="{DynamicResource BrandBrush}" Margin="5" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -477,16 +508,79 @@
                     <Grid Height="24" Background="Transparent">
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
-                                <RepeatButton Style="{StaticResource SliderBar}" Background="{StaticResource BrandGradientHorizontal}" Command="Slider.DecreaseLarge" />
+                                <RepeatButton Style="{StaticResource SliderBar}" Background="{DynamicResource BrandGradientHorizontal}" Command="Slider.DecreaseLarge" />
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
-                                <RepeatButton Style="{StaticResource SliderBar}" Background="#2EFFFFFF" Command="Slider.IncreaseLarge" />
+                                <RepeatButton Style="{StaticResource SliderBar}" Background="{DynamicResource SliderTrackBrush}" Command="Slider.IncreaseLarge" />
                             </Track.IncreaseRepeatButton>
                             <Track.Thumb>
                                 <Thumb Style="{StaticResource SliderKnob}" />
                             </Track.Thumb>
                         </Track>
                     </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Hue picker for the custom theme: a rainbow track (0–360) with the usual knob -->
+    <Style x:Key="HueSlider" TargetType="Slider">
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="360" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="IsMoveToPointEnabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Height="24" Background="Transparent">
+                        <Border Height="10" CornerRadius="5" Margin="8,0" VerticalAlignment="Center">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#FF0000" Offset="0" />
+                                    <GradientStop Color="#FFFF00" Offset="0.1667" />
+                                    <GradientStop Color="#00FF00" Offset="0.3333" />
+                                    <GradientStop Color="#00FFFF" Offset="0.5" />
+                                    <GradientStop Color="#0000FF" Offset="0.6667" />
+                                    <GradientStop Color="#FF00FF" Offset="0.8333" />
+                                    <GradientStop Color="#FF0000" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SliderBar}" Background="Transparent" Command="Slider.DecreaseLarge" />
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Style="{StaticResource SliderBar}" Background="Transparent" Command="Slider.IncreaseLarge" />
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource SliderKnob}" />
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A round colour button (custom theme quick picks); the colour is the button's Background -->
+    <Style x:Key="ColorDot" TargetType="Button">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Margin" Value="0,0,8,8" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Ellipse x:Name="Ring" Stroke="{DynamicResource StrongTextBrush}" StrokeThickness="2" Opacity="0" />
+                        <Ellipse Fill="{TemplateBinding Background}" Margin="4" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Ring" Property="Opacity" Value="0.6" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -500,7 +594,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="12"
+            <TextBlock Grid.Column="1" Text="{Binding Detail}" Foreground="{DynamicResource MutedBrush}" FontSize="12"
                        Margin="16,0,0,0" VerticalAlignment="Center" />
         </Grid>
     </DataTemplate>

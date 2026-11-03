@@ -7,8 +7,11 @@
         Width="1240" Height="820" MinWidth="1000" MinHeight="680"
         WindowStartupLocation="CenterScreen"
         AllowDrop="True" DragOver="OnWindowDragOver" Drop="OnWindowDrop"
-        PreviewKeyDown="OnPreviewKeyDown">
+        PreviewKeyDown="OnPreviewKeyDown"
+        Background="{DynamicResource WindowBrush}">
     <Grid>
+    <!-- Everything but the overlays; blurred while the download options pop-up is open. -->
+    <Grid x:Name="AppContent">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -23,13 +26,13 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Width="32" Height="32" CornerRadius="9" Background="{StaticResource BrandGradient}">
+                <Border Width="32" Height="32" CornerRadius="9" Background="{DynamicResource BrandGradient}">
                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" Foreground="White" FontSize="15" HorizontalAlignment="Center" />
                 </Border>
                 <TextBlock Text="Snag" FontSize="19" FontWeight="SemiBold" Margin="11,0,0,1" VerticalAlignment="Center" />
             </StackPanel>
 
-            <Border Grid.Column="1" Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+            <Border Grid.Column="1" Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                     CornerRadius="21" Padding="3">
                 <StackPanel Orientation="Horizontal">
                     <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
@@ -64,7 +67,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE713;" />
                             <TextBlock Text="Settings" Margin="8,0,0,0" />
-                            <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource BrandGradient}" Margin="7,0,0,0"
+                            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource BrandGradient}" Margin="7,0,0,0"
                                     ToolTip="A new version of Snag is available"
                                     Visibility="{Binding HasAppUpdate, Converter={StaticResource Vis}}" />
                         </StackPanel>
@@ -74,7 +77,7 @@
 
             <!-- Now playing -->
             <Border Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
-                    Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+                    Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                     CornerRadius="19" Padding="4,3,14,3" ToolTip="Open the player"
                     Visibility="{Binding Player.HasCurrent, Converter={StaticResource Vis}}">
                 <Border.InputBindings>
@@ -84,7 +87,7 @@
                     <Button Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="12"
                             Content="{Binding Player.PlayGlyph}" Command="{Binding Player.TogglePlayCommand}" ToolTip="Play / pause" />
                     <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" FontSize="11" Foreground="{StaticResource BrandBrush}"
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" FontSize="11" Foreground="{DynamicResource BrandBrush}"
                                    Margin="0,0,7,0" ToolTip="Will shut down when the playlist ends"
                                    Visibility="{Binding Player.ShutdownWhenDone, Converter={StaticResource Vis}}" />
                         <TextBlock Text="{Binding Player.Current.Title}" MaxWidth="230" TextTrimming="CharacterEllipsis" FontSize="12.5" />
@@ -100,24 +103,41 @@
             <views:HistoryView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=History}" />
             <views:SettingsView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Settings}" />
         </Grid>
+    </Grid>
+
+        <!-- Download options pop-up (Settings > Downloads). Shown and animated by MainWindow.xaml.cs. -->
+        <Grid x:Name="OptionsOverlay" Visibility="Collapsed">
+            <Border Background="{DynamicResource ScrimBrush}" Opacity="0.45" MouseLeftButtonDown="OnOptionsScrimClick" />
+            <Border x:Name="OptionsCard" Style="{StaticResource Card}" Background="{DynamicResource SurfaceBrush}" Padding="0"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"
+                    KeyboardNavigation.TabNavigation="Cycle">
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="OptionsCardScale" />
+                </Border.RenderTransform>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="50" ShadowDepth="10" Opacity="0.45" />
+                </Border.Effect>
+                <views:DownloadPopup />
+            </Border>
+        </Grid>
 
         <!-- Toast -->
-        <Border Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" Padding="16,11"
-                CornerRadius="10" Background="#F2303040" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" Padding="16,11"
+                CornerRadius="10" Background="{DynamicResource ToastBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                 IsHitTestVisible="False" Visibility="{Binding ToastText, Converter={StaticResource Vis}}">
             <Border.Effect>
                 <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.45" />
             </Border.Effect>
             <StackPanel Orientation="Horizontal">
-                <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" Foreground="{StaticResource BrandBrush}" />
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" Foreground="{DynamicResource BrandBrush}" />
                 <TextBlock Text="{Binding ToastText}" Margin="10,0,0,0" FontSize="13" />
             </StackPanel>
         </Border>
 
         <!-- Shutdown countdown -->
-        <Grid Grid.RowSpan="2" Background="{StaticResource ScrimBrush}"
+        <Grid Background="{DynamicResource ScrimBrush}"
               Visibility="{Binding Shutdown.IsOpen, Converter={StaticResource Vis}}">
-            <Border Style="{StaticResource Card}" Background="{StaticResource SurfaceBrush}" Width="440" Padding="32"
+            <Border Style="{StaticResource Card}" Background="{DynamicResource SurfaceBrush}" Width="440" Padding="32"
                     HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Border.Effect>
                     <DropShadowEffect BlurRadius="40" ShadowDepth="8" Opacity="0.5" />
@@ -127,12 +147,12 @@
                         <controls:Ring Value="{Binding Shutdown.Fraction}" Thickness="6" />
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding Shutdown.SecondsLeft}" FontSize="36" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                            <TextBlock Text="seconds" Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center" />
+                            <TextBlock Text="seconds" Foreground="{DynamicResource MutedBrush}" FontSize="12" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Grid>
                     <TextBlock Text="Playlist finished" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,22,0,6" />
                     <TextBlock Text="{Binding Shutdown.Message}" Style="{StaticResource Muted}" FontSize="13.5" TextAlignment="Center" />
-                    <TextBlock Text="{Binding Shutdown.Warning}" Foreground="{StaticResource DangerBrush}" TextAlignment="Center" TextWrapping="Wrap"
+                    <TextBlock Text="{Binding Shutdown.Warning}" Foreground="{DynamicResource DangerBrush}" TextAlignment="Center" TextWrapping="Wrap"
                                Margin="0,10,0,0" Visibility="{Binding Shutdown.Warning, Converter={StaticResource Vis}}" />
                     <Grid Margin="0,26,0,0">
                         <Grid.ColumnDefinitions>
@@ -145,7 +165,7 @@
                         <Button Grid.Column="2" Style="{StaticResource GhostButton}" Height="44"
                                 Content="Shut down now" Command="{Binding Shutdown.ShutDownNowCommand}" />
                     </Grid>
-                    <TextBlock Text="Press Esc to cancel" Foreground="{StaticResource FaintBrush}" FontSize="11.5" HorizontalAlignment="Center" Margin="0,14,0,0" />
+                    <TextBlock Text="Press Esc to cancel" Foreground="{DynamicResource FaintBrush}" FontSize="11.5" HorizontalAlignment="Center" Margin="0,14,0,0" />
                 </StackPanel>
             </Border>
         </Grid>

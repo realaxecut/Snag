@@ -7,21 +7,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Theme.xaml" />
             </ResourceDictionary.MergedDictionaries>
-
-            <!-- Brand accent for the Fluent controls. These live in the root dictionary so they win over the theme's own. -->
-            <Color x:Key="SystemAccentColor">#8B6CFF</Color>
-            <Color x:Key="SystemAccentColorLight1">#9D83FF</Color>
-            <Color x:Key="SystemAccentColorLight2">#B09BFF</Color>
-            <Color x:Key="SystemAccentColorLight3">#C6B7FF</Color>
-            <Color x:Key="SystemAccentColorDark1">#7353F0</Color>
-            <Color x:Key="SystemAccentColorDark2">#5C3FD6</Color>
-            <Color x:Key="SystemAccentColorDark3">#452DB0</Color>
-            <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#A48BFF" />
-            <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#E6A48BFF" />
-            <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#CCA48BFF" />
-            <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#C6B7FF" />
-            <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#C6B7FF" />
-            <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#B09BFF" />
+            <!-- Services\ThemeManager.cs adds the theme's colours (and the Fluent accent) here at startup. -->
         </ResourceDictionary>
     </Application.Resources>
 </Application>

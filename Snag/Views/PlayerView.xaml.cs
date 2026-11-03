@@ -427,6 +427,8 @@ public partial class PlayerView : UserControl, IMediaHost
         Grid.SetRowSpan(Stage, on ? 2 : 1);
         Controls.Padding = on ? new Thickness(36, 90, 36, 26) : new Thickness(4, 14, 4, 0);
         Controls.Background = on ? (Brush)Controls.Resources["OverlayScrim"] : null;
+        // Over the video the controls are white-on-dark in every theme.
+        ThemeManager.UseDarkColors(Controls.Resources, on);
         UpdateStageClip();
 
         if (on)

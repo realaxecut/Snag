@@ -12,8 +12,6 @@ public sealed class Ring : FrameworkElement
     public static readonly DependencyProperty ThicknessProperty = DependencyProperty.Register(
         nameof(Thickness), typeof(double), typeof(Ring), new FrameworkPropertyMetadata(6.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    private static readonly Brush TrackBrush = Frozen(new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)));
-    private static readonly Brush FillBrush = Frozen(new LinearGradientBrush(Color.FromRgb(0x7C, 0x5C, 0xFF), Color.FromRgb(0xC0, 0x4B, 0xF2), 45));
 
     public double Value
     {
@@ -32,14 +30,18 @@ public sealed class Ring : FrameworkElement
         var size = Math.Min(ActualWidth, ActualHeight);
         if (size <= Thickness) return;
 
+        // Theme colours, looked up on every draw (the countdown redraws each second).
+        var track = TryFindResource("TrackBrush") as Brush ?? Brushes.Gray;
+        var fill = TryFindResource("BrandGradient") as Brush ?? Brushes.MediumPurple;
+
         var radius = (size - Thickness) / 2;
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
-        dc.DrawEllipse(null, new Pen(TrackBrush, Thickness), center, radius, radius);
+        dc.DrawEllipse(null, new Pen(track, Thickness), center, radius, radius);
 
         var value = Math.Clamp(Value, 0, 1);
         if (value <= 0) return;
 
-        var pen = new Pen(FillBrush, Thickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        var pen = new Pen(fill, Thickness) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
         if (value >= 0.9999)
         {
             dc.DrawEllipse(null, pen, center, radius, radius);
@@ -58,11 +60,5 @@ public sealed class Ring : FrameworkElement
         }
         arc.Freeze();
         dc.DrawGeometry(null, pen, arc);
-    }
-
-    private static Brush Frozen(Brush brush)
-    {
-        brush.Freeze();
-        return brush;
     }
 }

@@ -16,12 +16,28 @@ public sealed class AppSettings
     public bool AddDownloadsToPlayer { get; set; } = true;
     public bool AutoUpdateYtDlp { get; set; } = true;
     public bool CheckAppUpdates { get; set; } = true;
+    public string Theme { get; set; } = ThemeManager.DefaultThemeId;
+    public Appearance Appearance { get; set; } = Appearance.Dark;
+    public string CustomAccent { get; set; } = "#7C5CFF";
+    public bool CustomTint { get; set; } = true;
+    public List<ThemePresetDto> ThemePresets { get; set; } = [];
+    public bool OptionsPopup { get; set; }
     public DateTime? LastAppUpdateCheckUtc { get; set; }
     public bool NumberPlaylistItems { get; set; } = true;
     public double Volume { get; set; } = 0.8;
     public bool Shuffle { get; set; }
     public string Repeat { get; set; } = "Off";
     public List<PlaylistEntryDto> Playlist { get; set; } = [];
+}
+
+/// <summary>A saved custom theme: its colour, background tint and light/dark mode.</summary>
+public sealed class ThemePresetDto
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Accent { get; set; } = "#7C5CFF";
+    public bool Tint { get; set; } = true;
+    public Appearance Appearance { get; set; } = Appearance.Dark;
 }
 
 public sealed class PlaylistEntryDto
@@ -59,6 +75,16 @@ public static class SettingsStore
         if (string.IsNullOrWhiteSpace(settings.OutputFolder) || !Path.IsPathFullyQualified(settings.OutputFolder))
             settings.OutputFolder = AppPaths.DefaultDownloadsDir();
         settings.Volume = double.IsFinite(settings.Volume) ? Math.Clamp(settings.Volume, 0, 1) : 0.8;
+        if (!Enum.IsDefined(settings.Appearance)) settings.Appearance = Appearance.Dark;
+        if (!ThemeManager.TryParseHex(settings.CustomAccent, out _)) settings.CustomAccent = "#7C5CFF";
+        settings.ThemePresets = (settings.ThemePresets ?? [])
+            .Where(p => p is not null && ThemeManager.IsPresetId(p.Id) && ThemeManager.TryParseHex(p.Accent, out _) && Enum.IsDefined(p.Appearance))
+            .DistinctBy(p => p.Id)
+            .Take(MaxThemePresets)
+            .ToList();
+        foreach (var preset in settings.ThemePresets) preset.Name = CleanPresetName(preset.Name);
+        if (!ThemeManager.IsKnown(settings.Theme) && settings.Theme != ThemeManager.CustomId && settings.ThemePresets.All(p => p.Id != settings.Theme))
+            settings.Theme = ThemeManager.DefaultThemeId;
         settings.Playlist ??= [];
         return settings;
     }
@@ -75,6 +101,28 @@ public static class SettingsStore
         catch (Exception ex)
         {
             Log.Error("Couldn't save settings", ex);
+        }
+    }
+
+    public const int MaxThemePresets = 24;
+
+    /// <summary>One line, no control characters, at most 30 characters.</summary>
+    public static string CleanPresetName(string? name)
+    {
+        var clean = new string((name ?? "").Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (clean.Length > 30) clean = clean[..30].TrimEnd();
+        return clean.Length == 0 ? "My theme" : clean;
+    }
+
+    /// <summary>The custom colour being edited plus every saved preset, as themes Snag can apply.</summary>
+    public static IEnumerable<ThemeColor> CustomThemes(AppSettings settings)
+    {
+        if (ThemeManager.TryParseHex(settings.CustomAccent, out var accent))
+            yield return ThemeManager.FromAccent(ThemeManager.CustomId, "Custom", accent, settings.CustomTint);
+        foreach (var preset in settings.ThemePresets)
+        {
+            if (ThemeManager.TryParseHex(preset.Accent, out var color))
+                yield return ThemeManager.FromAccent(preset.Id, preset.Name, color, preset.Tint);
         }
     }
 

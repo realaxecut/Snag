@@ -18,7 +18,9 @@ public partial class App : Application
         DryRunShutdown = e.Args.Any(a => string.Equals(a, "--dry-run-shutdown", StringComparison.OrdinalIgnoreCase));
 
         // Applied in code (not XAML) so the Fluent dictionaries are added after our own resources load.
-        ThemeMode = ThemeMode.Dark;
+        var settings = SettingsStore.Load();
+        ThemeManager.SetCustomThemes(SettingsStore.CustomThemes(settings));
+        ThemeManager.Apply(settings.Theme, settings.Appearance);
         DispatcherUnhandledException += OnUnhandledException;
 
         var window = new MainWindow();

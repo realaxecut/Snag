@@ -17,14 +17,14 @@
             <StackPanel VerticalAlignment="Center">
                 <TextBlock Text="Download history" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding HistorySummary, TargetNullValue='Everything you download shows up here'}"
-                           Foreground="{StaticResource MutedBrush}" FontSize="12.5" Margin="0,3,0,0" />
+                           Foreground="{DynamicResource MutedBrush}" FontSize="12.5" Margin="0,3,0,0" />
             </StackPanel>
             <Grid Grid.Column="1" Width="300" Margin="16,0,0,0">
                 <TextBox x:Name="SearchBox" Text="{Binding HistorySearch, UpdateSourceTrigger=PropertyChanged}" Height="40"
                          VerticalContentAlignment="Center" Padding="36,0,10,0" />
-                <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" Foreground="{StaticResource MutedBrush}" Margin="13,0,0,0"
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" Foreground="{DynamicResource MutedBrush}" Margin="13,0,0,0"
                            HorizontalAlignment="Left" IsHitTestVisible="False" />
-                <TextBlock Text="Search downloads" Foreground="{StaticResource FaintBrush}" Margin="37,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                <TextBlock Text="Search downloads" Foreground="{DynamicResource FaintBrush}" Margin="37,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                            Visibility="{Binding HistorySearch, Converter={StaticResource Vis}, ConverterParameter=!}" />
             </Grid>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0">
@@ -56,7 +56,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Grid Width="112" Height="63" VerticalAlignment="Center">
-                                    <Border CornerRadius="7" Background="{StaticResource TileBrush}" />
+                                    <Border CornerRadius="7" Background="{DynamicResource TileBrush}" />
                                     <Border CornerRadius="7">
                                         <Border.Background>
                                             <ImageBrush ImageSource="{Binding ThumbnailUrl, Converter={StaticResource Img}}" Stretch="UniformToFill" />
@@ -69,10 +69,10 @@
                                 <StackPanel Grid.Column="1" Margin="16,0,12,0" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding FilePath}" />
                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                        <Border Background="{StaticResource BrandSoftBrush}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" />
+                                        <Border Background="{DynamicResource BrandSoftBrush}" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Badge}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource BrandBrush}" />
                                         </Border>
-                                        <TextBlock x:Name="DetailText" Text="{Binding Details}" Foreground="{StaticResource MutedBrush}" FontSize="12.5"
+                                        <TextBlock x:Name="DetailText" Text="{Binding Details}" Foreground="{DynamicResource MutedBrush}" FontSize="12.5"
                                                    Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </StackPanel>
@@ -84,7 +84,7 @@
                                     <Button Style="{StaticResource IconButton}" Content="&#xE8B7;" ToolTip="Show in folder"
                                             Command="{Binding DataContext.ShowHistoryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" />
                                     <Button x:Name="DeleteButton" Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Delete from your computer (moves it to the Recycle Bin)"
-                                            Foreground="{StaticResource DangerBrush}" Margin="4,0,0,0"
+                                            Foreground="{DynamicResource DangerBrush}" Margin="4,0,0,0"
                                             Command="{Binding DataContext.DeleteHistoryCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" CommandParameter="{Binding}" />
                                 </StackPanel>
                             </Grid>
@@ -95,7 +95,7 @@
                                 <DataTrigger Binding="{Binding Exists}" Value="False">
                                     <Setter TargetName="Row" Property="Opacity" Value="0.55" />
                                     <Setter TargetName="DetailText" Property="Text" Value="File not found: it was moved or deleted" />
-                                    <Setter TargetName="DetailText" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    <Setter TargetName="DetailText" Property="Foreground" Value="{DynamicResource DangerBrush}" />
                                     <Setter TargetName="DeleteButton" Property="ToolTip" Value="Remove from history" />
                                 </DataTrigger>
                             </DataTemplate.Triggers>
@@ -105,8 +105,8 @@
 
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"
                             Visibility="{Binding HasHistory, Converter={StaticResource Vis}, ConverterParameter=!}">
-                    <Border Width="66" Height="66" CornerRadius="19" Background="{StaticResource BrandSoftBrush}" HorizontalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE81C;" FontSize="26" Foreground="{StaticResource BrandBrush}" HorizontalAlignment="Center" />
+                    <Border Width="66" Height="66" CornerRadius="19" Background="{DynamicResource BrandSoftBrush}" HorizontalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE81C;" FontSize="26" Foreground="{DynamicResource BrandBrush}" HorizontalAlignment="Center" />
                     </Border>
                     <TextBlock Text="No downloads yet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,6" />
                     <TextBlock Text="Everything you download shows up here, so you can play it, find it, or delete it." Style="{StaticResource Muted}"

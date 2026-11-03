@@ -1,0 +1,95 @@
+<!-- Format, quality, folder and extras, plus the Download button. Used beside the preview and in the options pop-up. -->
+<UserControl x:Class="Snag.Views.DownloadOptionsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <Button DockPanel.Dock="Bottom" Style="{StaticResource PrimaryButton}" Height="50" Margin="0,16,0,0" Command="{Binding DownloadCommand}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="15" />
+                <TextBlock Text="{Binding DownloadLabel}" Margin="10,0,0,0" FontSize="14.5" />
+            </StackPanel>
+        </Button>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,-14,0" Padding="0,0,14,0">
+            <StackPanel>
+                <TextBlock Text="Download options" FontSize="16" FontWeight="SemiBold" />
+
+                <TextBlock Text="FORMAT" Style="{StaticResource Label}" />
+                <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="11" Padding="3">
+                    <UniformGrid Columns="2">
+                        <RadioButton Style="{StaticResource Segment}" IsChecked="{Binding IsMp4}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE714;" />
+                                <TextBlock Text="MP4 video" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource Segment}" IsChecked="{Binding IsMp3}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" />
+                                <TextBlock Text="MP3 audio" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+                    </UniformGrid>
+                </Border>
+
+                <StackPanel Visibility="{Binding IsMp4, Converter={StaticResource Vis}}">
+                    <TextBlock Text="VIDEO CODEC" Style="{StaticResource Label}" />
+                    <ComboBox ItemsSource="{Binding CodecOptions}" SelectedItem="{Binding SelectedCodec}"
+                              ItemTemplate="{StaticResource QualityTemplate}" ItemContainerStyle="{StaticResource OptionItem}"
+                              HorizontalContentAlignment="Stretch" MinHeight="40" />
+                    <TextBlock Text="{Binding VideoQualityHeading}" Style="{StaticResource Label}" />
+                    <ComboBox ItemsSource="{Binding VideoQualities}" SelectedItem="{Binding SelectedVideoQuality}"
+                              ItemTemplate="{StaticResource QualityTemplate}" ItemContainerStyle="{StaticResource OptionItem}"
+                              HorizontalContentAlignment="Stretch" MinHeight="40" />
+                    <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="2,8,0,0"
+                               Text="Saved as MP4. Snag's player plays every codec; H.264 also plays on almost any other device. Greyed-out sizes don't exist in the chosen codec." />
+                </StackPanel>
+                <StackPanel Visibility="{Binding IsMp3, Converter={StaticResource Vis}}">
+                    <TextBlock Text="AUDIO QUALITY" Style="{StaticResource Label}" />
+                    <ComboBox ItemsSource="{Binding AudioQualities}" SelectedItem="{Binding SelectedAudioQuality}"
+                              ItemTemplate="{StaticResource QualityTemplate}" HorizontalContentAlignment="Stretch" MinHeight="40" />
+                    <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="2,8,0,0"
+                               Text="YouTube's own audio tops out around 160 kbps, so higher MP3 bitrates mostly add size." />
+                </StackPanel>
+
+                <TextBlock Text="SAVE TO" Style="{StaticResource Label}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Border Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="12,0" Height="38" ToolTip="{Binding OutputFolder}">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" Foreground="{DynamicResource MutedBrush}" />
+                            <TextBlock Text="{Binding OutputFolder}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="12.5" />
+                        </DockPanel>
+                    </Border>
+                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" Height="38" Margin="8,0,0,0" Content="Change"
+                            Command="{Binding BrowseFolderCommand}" />
+                </Grid>
+                <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="2,8,0,0" Text="Each playlist gets its own subfolder."
+                           Visibility="{Binding IsPlaylistPreview, Converter={StaticResource Vis}}" />
+
+                <TextBlock Text="EXTRAS" Style="{StaticResource Label}" />
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding EmbedThumbnail}" Margin="0,2,0,14">
+                    <StackPanel>
+                        <TextBlock Text="Cover art &amp; metadata" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock Text="Thumbnail, title, channel and chapters" Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" />
+                    </StackPanel>
+                </CheckBox>
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding EmbedSubtitles}" IsEnabled="{Binding IsMp4}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="English subtitles" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock Text="Embedded in the MP4 when the video has them" Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" />
+                    </StackPanel>
+                </CheckBox>
+                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding SponsorBlock}">
+                    <StackPanel>
+                        <TextBlock Text="Skip sponsor segments" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock Text="Cuts sponsor and self-promo parts using the community SponsorBlock database" Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" />
+                    </StackPanel>
+                </CheckBox>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

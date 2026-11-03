@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Snag.Services;
@@ -48,6 +49,8 @@ public sealed class MainViewModel : ObservableObject
     private readonly YtDlpService _ytdlp;
     private readonly DispatcherTimer _saveTimer = new() { Interval = TimeSpan.FromMilliseconds(800) };
     private readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(3.5) };
+    private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromMilliseconds(60) };
+    private string? _customAccentDraft;
     private CancellationTokenSource? _analyzeCts;
     private CancellationTokenSource? _toolsCts;
     private CancellationTokenSource? _appUpdateCts;
@@ -144,6 +147,23 @@ public sealed class MainViewModel : ObservableObject
         CancelAppUpdateCommand = new RelayCommand(() => _appUpdateCts?.Cancel(), () => AppUpdateBusy);
         OpenReleaseNotesCommand = new RelayCommand(() => AppUpdater.OpenInBrowser(AppUpdate?.PageUrl ?? AppUpdater.ReleasesPage));
 
+        OpenOptionsPopupCommand = new RelayCommand(() => IsOptionsPopupOpen = true,
+            () => UseOptionsPopup && Preview is PreviewState.Video or PreviewState.Playlist);
+        CloseOptionsPopupCommand = new RelayCommand(() => IsOptionsPopupOpen = false);
+
+        PickCustomColorCommand = new RelayCommand(p =>
+        {
+            if (p is string hex && ThemeManager.TryParseHex(hex, out var color)) SetCustomAccent(color);
+        });
+        SaveThemePresetCommand = new RelayCommand(SaveThemePreset, () => _settings.ThemePresets.Count < SettingsStore.MaxThemePresets);
+        DeleteThemePresetCommand = new RelayCommand(DeleteThemePreset, () => IsPresetTheme);
+        EditThemePresetCommand = new RelayCommand(EditThemePreset, () => IsPresetTheme);
+        _themeTimer.Tick += (_, _) =>
+        {
+            _themeTimer.Stop();
+            ThemeManager.Apply(_settings.Theme, _settings.Appearance);
+        };
+
         GoToPlayerCommand = new RelayCommand(() => Page = AppPage.Player);
         ToggleFullscreenCommand = new RelayCommand(() => IsFullscreen = !IsFullscreen);
 
@@ -161,6 +181,8 @@ public sealed class MainViewModel : ObservableObject
         RefreshQueue();
         RefreshHistorySummary();
         RefreshAppUpdateStatus();
+        BuildThemeSwatches();
+        ThemeManager.Changed += OnThemeChanged;
     }
 
     // ---------------------------------------------------------------- shared state
@@ -196,6 +218,12 @@ public sealed class MainViewModel : ObservableObject
     public ICommand InstallAppUpdateCommand { get; }
     public ICommand CancelAppUpdateCommand { get; }
     public ICommand OpenReleaseNotesCommand { get; }
+    public ICommand OpenOptionsPopupCommand { get; }
+    public ICommand CloseOptionsPopupCommand { get; }
+    public ICommand PickCustomColorCommand { get; }
+    public ICommand SaveThemePresetCommand { get; }
+    public ICommand DeleteThemePresetCommand { get; }
+    public ICommand EditThemePresetCommand { get; }
     public ICommand GoToPlayerCommand { get; }
     public ICommand ToggleFullscreenCommand { get; }
     public ICommand PlayHistoryCommand { get; }
@@ -295,6 +323,206 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _settings.CheckAppUpdates;
         set => UpdateSetting(() => _settings.CheckAppUpdates = value);
+    }
+
+    // ---------------------------------------------------------------- appearance
+
+    /// <summary>Light, dark or follow Windows; every colour theme comes in both.</summary>
+    public Appearance Appearance
+    {
+        get => _settings.Appearance;
+        set
+        {
+            if (value == _settings.Appearance) return;
+            // With a preset selected, its saved mode changes too: it's the user's own theme.
+            if (SelectedPreset is { } preset) preset.Appearance = value;
+            UpdateSetting(() => _settings.Appearance = value);
+            ThemeManager.Apply(_settings.Theme, value);
+            OnPropertyChanged(nameof(SelectedPresetText));
+        }
+    }
+
+    /// <summary>Built-in colours, then saved presets, then "Custom"; drawn in whichever of light or dark is showing.</summary>
+    public ObservableCollection<ThemeSwatch> ThemeSwatches { get; } = [];
+
+    public ThemeSwatch SelectedTheme
+    {
+        get => ThemeSwatches.FirstOrDefault(s => s.Id == _settings.Theme) ?? ThemeSwatches[0];
+        set
+        {
+            if (value is null || value.Id == _settings.Theme) return;
+            _settings.Theme = value.Id;
+            // A preset brings its own light/dark mode with it.
+            if (_settings.ThemePresets.FirstOrDefault(p => p.Id == value.Id) is { } preset) _settings.Appearance = preset.Appearance;
+            SaveSoon();
+            ThemeManager.Apply(_settings.Theme, _settings.Appearance);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Appearance));
+            OnPropertyChanged(nameof(IsCustomTheme));
+            OnPropertyChanged(nameof(IsPresetTheme));
+            OnPropertyChanged(nameof(SelectedPresetText));
+        }
+    }
+
+    public bool IsCustomTheme => _settings.Theme == ThemeManager.CustomId;
+    public bool IsPresetTheme => SelectedPreset is not null;
+    private ThemePresetDto? SelectedPreset => _settings.ThemePresets.FirstOrDefault(p => p.Id == _settings.Theme);
+    public string? SelectedPresetText => SelectedPreset is { } p ? $"{p.Name}  ·  {p.Appearance} mode" : null;
+
+    /// <summary>The custom colour, as #RRGGBB. Typing an incomplete value is fine; it's used once it's valid.</summary>
+    public string CustomAccentText
+    {
+        get => _customAccentDraft ?? _settings.CustomAccent;
+        set
+        {
+            _customAccentDraft = value;
+            if (ThemeManager.TryParseHex(value, out var color)) SetCustomAccent(color, fromText: true);
+        }
+    }
+
+    public Brush CustomAccentBrush => ThemeManager.Solid(ThemeManager.Hex(_settings.CustomAccent));
+
+    /// <summary>The custom colour's hue (0–360), for the rainbow slider. Keeps its saturation and lightness.</summary>
+    public double CustomHue
+    {
+        get => ThemeManager.ToHsl(ThemeManager.Hex(_settings.CustomAccent)).H;
+        set
+        {
+            var (_, s, l) = ThemeManager.ToHsl(ThemeManager.Hex(_settings.CustomAccent));
+            // A grey has no hue to change, so moving the slider gives it some colour.
+            SetCustomAccent(ThemeManager.FromHsl(value, Math.Max(s, 0.55), Math.Clamp(l, 0.35, 0.7)));
+        }
+    }
+
+    public bool CustomTint
+    {
+        get => _settings.CustomTint;
+        set
+        {
+            UpdateSetting(() => _settings.CustomTint = value);
+            RefreshCustomThemes();
+        }
+    }
+
+    public string CustomPresetName { get; set => Set(ref field, value); } = "";
+
+    /// <summary>Colours to start from in the custom editor.</summary>
+    public IReadOnlyList<string> QuickColors { get; } =
+        ["#E11D48", "#F97316", "#F59E0B", "#22C55E", "#14B8A6", "#06B6D4", "#3B82F6", "#6366F1", "#8B5CF6", "#D946EF", "#EC4899", "#64748B"];
+
+    private void SetCustomAccent(Color color, bool fromText = false)
+    {
+        _settings.CustomAccent = ThemeManager.ToHex(color);
+        if (!fromText)
+        {
+            _customAccentDraft = null;
+            OnPropertyChanged(nameof(CustomAccentText));
+        }
+        OnPropertyChanged(nameof(CustomHue));
+        OnPropertyChanged(nameof(CustomAccentBrush));
+        SaveSoon();
+        RefreshCustomThemes();
+    }
+
+    /// <summary>Rebuilds the custom and preset themes after an edit, and shows the change if one of them is in use.</summary>
+    private void RefreshCustomThemes()
+    {
+        ThemeManager.SetCustomThemes(SettingsStore.CustomThemes(_settings));
+        foreach (var swatch in ThemeSwatches.Where(s => s.Kind != SwatchKind.BuiltIn))
+        {
+            if (ThemeManager.Find(swatch.Id) is { } theme) swatch.Theme = theme;
+        }
+        if (IsCustomTheme || IsPresetTheme)
+        {
+            // Dragging the hue slider fires constantly; repaint at most every 60 ms.
+            _themeTimer.Stop();
+            _themeTimer.Start();
+        }
+        else
+        {
+            OnThemeChanged();
+        }
+    }
+
+    private void SaveThemePreset()
+    {
+        if (_settings.ThemePresets.Count >= SettingsStore.MaxThemePresets) return;
+        var preset = new ThemePresetDto
+        {
+            Id = "preset-" + Guid.NewGuid().ToString("N")[..8],
+            Name = SettingsStore.CleanPresetName(string.IsNullOrWhiteSpace(CustomPresetName) ? $"My theme {_settings.ThemePresets.Count + 1}" : CustomPresetName),
+            Accent = _settings.CustomAccent,
+            Tint = _settings.CustomTint,
+            Appearance = ThemeManager.Current.IsLight ? Appearance.Light : Appearance.Dark,
+        };
+        _settings.ThemePresets.Add(preset);
+        ThemeManager.SetCustomThemes(SettingsStore.CustomThemes(_settings));
+        var swatch = new ThemeSwatch(ThemeManager.Find(preset.Id)!, SwatchKind.Preset);
+        swatch.ShowAs(ThemeManager.Current.IsLight);
+        ThemeSwatches.Insert(ThemeSwatches.Count - 1, swatch); // presets go just before "Custom"
+        CustomPresetName = "";
+        SelectedTheme = swatch;
+        ShowToast($"Saved \"{preset.Name}\"");
+    }
+
+    private void DeleteThemePreset()
+    {
+        if (SelectedPreset is not { } preset) return;
+        _settings.ThemePresets.Remove(preset);
+        if (ThemeSwatches.FirstOrDefault(s => s.Id == preset.Id) is { } swatch) ThemeSwatches.Remove(swatch);
+        ThemeManager.SetCustomThemes(SettingsStore.CustomThemes(_settings));
+        SelectedTheme = ThemeSwatches.First(s => s.Id == ThemeManager.CustomId);
+        ShowToast($"Deleted \"{preset.Name}\"");
+    }
+
+    /// <summary>Copies the selected preset into the custom editor, to change it or save a variation.</summary>
+    private void EditThemePreset()
+    {
+        if (SelectedPreset is not { } preset || !ThemeManager.TryParseHex(preset.Accent, out var color)) return;
+        _settings.CustomTint = preset.Tint;
+        OnPropertyChanged(nameof(CustomTint));
+        SetCustomAccent(color);
+        CustomPresetName = preset.Name;
+        SelectedTheme = ThemeSwatches.First(s => s.Id == ThemeManager.CustomId);
+    }
+
+    private void BuildThemeSwatches()
+    {
+        ThemeManager.SetCustomThemes(SettingsStore.CustomThemes(_settings));
+        foreach (var theme in ThemeManager.Themes) ThemeSwatches.Add(new ThemeSwatch(theme, SwatchKind.BuiltIn));
+        foreach (var preset in _settings.ThemePresets)
+        {
+            if (ThemeManager.Find(preset.Id) is { } theme) ThemeSwatches.Add(new ThemeSwatch(theme, SwatchKind.Preset));
+        }
+        ThemeSwatches.Add(new ThemeSwatch(ThemeManager.Find(ThemeManager.CustomId)!, SwatchKind.Custom));
+        OnThemeChanged();
+    }
+
+    private void OnThemeChanged()
+    {
+        foreach (var swatch in ThemeSwatches) swatch.ShowAs(ThemeManager.Current.IsLight);
+    }
+
+    /// <summary>Settings: show download options in a pop-up (with the app blurred behind) instead of beside the preview. Off by default.</summary>
+    public bool UseOptionsPopup
+    {
+        get => _settings.OptionsPopup;
+        set
+        {
+            UpdateSetting(() => _settings.OptionsPopup = value);
+            if (!value) IsOptionsPopupOpen = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public bool IsOptionsPopupOpen
+    {
+        get;
+        private set
+        {
+            if (value && Page != AppPage.Download) Page = AppPage.Download;
+            Set(ref field, value);
+        }
     }
 
     // ---------------------------------------------------------------- link + preview
@@ -589,6 +817,7 @@ public sealed class MainViewModel : ObservableObject
         _analyzeCts?.Cancel();
         var cts = _analyzeCts = new CancellationTokenSource();
         AnalyzeError = null;
+        IsOptionsPopupOpen = false;
         Preview = PreviewState.Loading;
         try
         {
@@ -650,10 +879,12 @@ public sealed class MainViewModel : ObservableObject
             Preview = PreviewState.Video;
         }
         OnPropertyChanged(nameof(HasFocusVideo));
+        if (UseOptionsPopup) IsOptionsPopupOpen = true;
     }
 
     private void ResetPreview()
     {
+        IsOptionsPopupOpen = false;
         _info = null;
         _focusVideoId = null;
         Entries = [];
@@ -888,6 +1119,7 @@ public sealed class MainViewModel : ObservableObject
         }
 
         if (added == 0) return;
+        IsOptionsPopupOpen = false;
         ShowToast(added == 1 ? "Added to downloads" : $"Added {added} videos to downloads");
         Pump();
     }

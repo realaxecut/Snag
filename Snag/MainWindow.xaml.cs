@@ -6,7 +6,10 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
+using Snag.Services;
 using Snag.ViewModels;
 
 namespace Snag;
@@ -27,12 +30,83 @@ public partial class MainWindow : Window
         _vm.Shutdown.Opened += OnShutdownCountdown;
         Loaded += async (_, _) => await _vm.InitializeAsync();
         Closing += OnClosing;
+        SourceInitialized += (_, _) => ApplyCaptionColor();
+        ThemeManager.Changed += ApplyCaptionColor;
+        Closed += (_, _) => ThemeManager.Changed -= ApplyCaptionColor;
+        SizeChanged += (_, _) =>
+        {
+            if (_vm.IsOptionsPopupOpen) SizeOptionsCard();
+        };
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.IsFullscreen)) ApplyFullscreen(_vm.IsFullscreen);
+        else if (e.PropertyName == nameof(MainViewModel.IsOptionsPopupOpen)) ShowOptionsPopup(_vm.IsOptionsPopupOpen);
     }
+
+    // ---------------------------------------------------------------- download options pop-up
+
+    private static readonly IEasingFunction PopupEase = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+    /// <summary>Fades the pop-up in or out while the rest of the window blurs (and sharpens again).</summary>
+    private void ShowOptionsPopup(bool open)
+    {
+        var duration = TimeSpan.FromMilliseconds(open ? 240 : 170);
+        if (open)
+        {
+            SizeOptionsCard();
+            OptionsOverlay.Visibility = Visibility.Visible;
+            if (AppContent.Effect is not BlurEffect)
+                AppContent.Effect = new BlurEffect { Radius = 0, RenderingBias = RenderingBias.Performance };
+        }
+        if (AppContent.Effect is not BlurEffect blur) return;
+
+        var fade = open
+            ? new DoubleAnimation(0, 1, duration) { EasingFunction = PopupEase }
+            : new DoubleAnimation(0, duration) { EasingFunction = PopupEase };
+        if (!open)
+        {
+            fade.Completed += (_, _) =>
+            {
+                if (_vm.IsOptionsPopupOpen) return; // opened again meanwhile
+                OptionsOverlay.Visibility = Visibility.Collapsed;
+                AppContent.Effect = null; // a blur costs GPU time even at radius 0
+            };
+        }
+        OptionsOverlay.BeginAnimation(OpacityProperty, fade);
+        blur.BeginAnimation(BlurEffect.RadiusProperty, new DoubleAnimation(open ? 22 : 0, duration) { EasingFunction = PopupEase });
+        var scale = new DoubleAnimation(open ? 0.94 : 1, open ? 1 : 0.96, duration) { EasingFunction = PopupEase };
+        OptionsCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+        OptionsCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
+
+        if (open) Dispatcher.BeginInvoke(() => OptionsCard.MoveFocus(new TraversalRequest(FocusNavigationDirection.First)), DispatcherPriority.Input);
+    }
+
+    private void SizeOptionsCard()
+    {
+        OptionsCard.Width = Math.Clamp(ActualWidth - 96, 700, 1020);
+        OptionsCard.Height = Math.Clamp(ActualHeight - 96, 460, 680);
+    }
+
+    private void OnOptionsScrimClick(object sender, MouseButtonEventArgs e) => _vm.CloseOptionsPopupCommand.Execute(null);
+
+    // ---------------------------------------------------------------- theme
+
+    /// <summary>Colours the title bar like the window (Windows 11; older versions ignore it).</summary>
+    private void ApplyCaptionColor()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        var palette = ThemeManager.Current;
+        var caption = palette.Window.R | (palette.Window.G << 8) | (palette.Window.B << 16);
+        var text = palette.IsLight ? 0x1F1B1B : 0xFFFFFF;
+        DwmSetWindowAttribute(hwnd, 35 /* DWMWA_CAPTION_COLOR */, ref caption, sizeof(int));
+        DwmSetWindowAttribute(hwnd, 36 /* DWMWA_TEXT_COLOR */, ref text, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     private void ApplyFullscreen(bool on)
     {
@@ -125,6 +199,17 @@ public partial class MainWindow : Window
                 e.Handled = true;
             }
             return;
+        }
+
+        if (_vm.IsOptionsPopupOpen)
+        {
+            // Esc closes the pop-up, unless it's closing a drop-down list inside it.
+            if (e.Key == Key.Escape && Keyboard.FocusedElement is not (ComboBoxItem or ComboBox { IsDropDownOpen: true }))
+            {
+                _vm.CloseOptionsPopupCommand.Execute(null);
+                e.Handled = true;
+            }
+            return; // the rest of the app is behind the pop-up
         }
 
         if (e.Key == Key.Escape && _vm.IsFullscreen)

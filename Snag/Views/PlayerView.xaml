@@ -51,7 +51,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <Grid Width="230" Height="230">
-                                <Border CornerRadius="18" Background="{StaticResource BrandGradient}">
+                                <Border CornerRadius="18" Background="{DynamicResource BrandGradient}">
                                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="68" Foreground="White" HorizontalAlignment="Center" />
                                 </Border>
                                 <Border CornerRadius="18">
@@ -67,8 +67,8 @@
 
                     <!-- Nothing loaded -->
                     <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <Border Width="70" Height="70" CornerRadius="20" Background="{StaticResource BrandSoftBrush}" HorizontalAlignment="Center">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="27" Foreground="{StaticResource BrandBrush}" HorizontalAlignment="Center" Margin="3,0,0,0" />
+                        <Border Width="70" Height="70" CornerRadius="20" Background="{DynamicResource BrandSoftBrush}" HorizontalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="27" Foreground="{DynamicResource BrandBrush}" HorizontalAlignment="Center" Margin="3,0,0,0" />
                         </Border>
                         <TextBlock Text="Nothing playing" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,20,0,6" />
                         <TextBlock Text="Add videos or songs from your PC, or download something; it can land here automatically."
@@ -93,7 +93,7 @@
                     <!-- Opening a video (only shown if the first frame takes a moment) -->
                     <StackPanel x:Name="LoadingState" Visibility="Collapsed" Width="180" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
                         <ProgressBar Style="{StaticResource SlimProgress}" IsIndeterminate="True" />
-                        <TextBlock Text="Opening…" Foreground="{StaticResource MutedBrush}" FontSize="12.5" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                        <TextBlock Text="Opening…" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" HorizontalAlignment="Center" Margin="0,10,0,0" />
                     </StackPanel>
 
                     <!-- Paused: a big play symbol over the picture -->
@@ -105,11 +105,11 @@
                     <!-- The playlist ran out -->
                     <Border x:Name="FinishedState" Visibility="Collapsed">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <Border Width="70" Height="70" CornerRadius="20" Background="{StaticResource BrandSoftBrush}" HorizontalAlignment="Center">
-                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" FontSize="26" Foreground="{StaticResource BrandBrush}" HorizontalAlignment="Center" />
+                            <Border Width="70" Height="70" CornerRadius="20" Background="{DynamicResource BrandSoftBrush}" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" FontSize="26" Foreground="{DynamicResource BrandBrush}" HorizontalAlignment="Center" />
                             </Border>
                             <TextBlock Text="Playlist finished" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,6" />
-                            <TextBlock Text="{Binding Player.Count, StringFormat='All {0} items have played.'}" Foreground="{StaticResource MutedBrush}" FontSize="13" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding Player.Count, StringFormat='All {0} items have played.'}" Foreground="{DynamicResource MutedBrush}" FontSize="13" HorizontalAlignment="Center" />
                             <Button Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" HorizontalAlignment="Center" Command="{Binding Player.ReplayCommand}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" />
@@ -122,11 +122,11 @@
                     <!-- Something wouldn't play -->
                     <StackPanel x:Name="ErrorState" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460">
                         <Border Width="70" Height="70" CornerRadius="20" Background="#33FF8080" HorizontalAlignment="Center">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE783;" FontSize="26" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE783;" FontSize="26" Foreground="{DynamicResource DangerBrush}" HorizontalAlignment="Center" />
                         </Border>
                         <TextBlock Text="Couldn't play this file" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,6" />
                         <TextBlock Text="{Binding Player.Current.Title}" Foreground="White" FontSize="13" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Player.Current.Error}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        <TextBlock Text="{Binding Player.Current.Error}" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
                             <Button Style="{StaticResource GhostButton}" Height="38" Click="OnRemoveCurrent">
                                 <StackPanel Orientation="Horizontal">
@@ -165,10 +165,10 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="54" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="ElapsedText" Text="0:00" FontSize="12" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ElapsedText" Text="0:00" FontSize="12" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
                     <Slider x:Name="SeekBar" Grid.Column="1" Style="{StaticResource MediaSlider}" Minimum="0" Maximum="1" VerticalAlignment="Center"
                             ValueChanged="OnSeekChanged" />
-                    <TextBlock x:Name="TotalText" Grid.Column="2" Text="0:00" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                    <TextBlock x:Name="TotalText" Grid.Column="2" Text="0:00" FontSize="12" Foreground="{DynamicResource MutedBrush}"
                                VerticalAlignment="Center" TextAlignment="Right" />
                 </Grid>
                 <Grid Grid.Row="1" Margin="0,6,0,0">
@@ -180,7 +180,7 @@
                     <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="{Binding Player.Current.Title, FallbackValue='Nothing playing', TargetNullValue='Nothing playing'}"
                                    FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Player.PositionText}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,3,0,0" />
+                        <TextBlock Text="{Binding Player.PositionText}" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,3,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Shuffle: purple with a dot when on -->
@@ -189,14 +189,14 @@
                                 <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Player.Shuffle}" Value="True">
-                                            <Setter Property="Foreground" Value="{StaticResource BrandBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
                             <Grid>
                                 <TextBlock Text="&#xE8B1;" FontSize="15" HorizontalAlignment="Center" />
-                                <Ellipse Width="4" Height="4" Fill="{StaticResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
+                                <Ellipse Width="4" Height="4" Fill="{DynamicResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
                                          Visibility="{Binding Player.Shuffle, Converter={StaticResource Vis}}" />
                             </Grid>
                         </Button>
@@ -212,20 +212,20 @@
                                 <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Player.IsRepeatOn}" Value="True">
-                                            <Setter Property="Foreground" Value="{StaticResource BrandBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
                             <Grid>
                                 <TextBlock Text="{Binding Player.RepeatGlyph}" FontSize="15" HorizontalAlignment="Center" />
-                                <Ellipse Width="4" Height="4" Fill="{StaticResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
+                                <Ellipse Width="4" Height="4" Fill="{DynamicResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
                                          Visibility="{Binding Player.IsRepeatOn, Converter={StaticResource Vis}}" />
                             </Grid>
                         </Button>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" Foreground="{StaticResource BrandBrush}" Margin="0,0,10,0"
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" Foreground="{DynamicResource BrandBrush}" Margin="0,0,10,0"
                                    ToolTip="Shuts down when the playlist ends"
                                    Visibility="{Binding Player.ShutdownWhenDone, Converter={StaticResource Vis}}" />
                         <Button Style="{StaticResource IconButton}" Content="{Binding Player.VolumeGlyph}" Command="{Binding Player.ToggleMuteCommand}" ToolTip="Mute (M)" />
@@ -255,7 +255,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Playlist" FontSize="15" FontWeight="SemiBold" />
-                        <TextBlock Text="Drag to reorder · drop files to add" Foreground="{StaticResource FaintBrush}" FontSize="11.5" Margin="0,2,0,0" />
+                        <TextBlock Text="Drag to reorder · drop files to add" Foreground="{DynamicResource FaintBrush}" FontSize="11.5" Margin="0,2,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button Style="{StaticResource IconButton}" Content="&#xE710;" ToolTip="Add files" Click="OnAddFiles" />
@@ -291,14 +291,14 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="Num" Text="{Binding Number}" Foreground="{StaticResource FaintBrush}" FontSize="12"
+                                <TextBlock x:Name="Num" Text="{Binding Number}" Foreground="{DynamicResource FaintBrush}" FontSize="12"
                                            VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                <TextBlock x:Name="NowGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" Foreground="{StaticResource BrandBrush}" FontSize="11"
+                                <TextBlock x:Name="NowGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" Foreground="{DynamicResource BrandBrush}" FontSize="11"
                                            HorizontalAlignment="Center" Visibility="Collapsed" />
                                 <Grid Grid.Column="1" Width="64" Height="36" Margin="4,0,0,0">
-                                    <Border CornerRadius="5" Background="{StaticResource TileBrush}">
+                                    <Border CornerRadius="5" Background="{DynamicResource TileBrush}">
                                         <TextBlock x:Name="KindGlyph" Style="{StaticResource Glyph}" Text="&#xE714;" FontSize="14"
-                                                   Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" />
+                                                   Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" />
                                     </Border>
                                     <Border CornerRadius="5">
                                         <Border.Background>
@@ -308,7 +308,7 @@
                                 </Grid>
                                 <StackPanel Grid.Column="2" Margin="10,0,6,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
-                                    <TextBlock x:Name="SubText" Text="{Binding Kind}" FontSize="11.5" Foreground="{StaticResource FaintBrush}"
+                                    <TextBlock x:Name="SubText" Text="{Binding Kind}" FontSize="11.5" Foreground="{DynamicResource FaintBrush}"
                                                TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                                 </StackPanel>
                                 <StackPanel x:Name="Actions" Grid.Column="3" Orientation="Horizontal" Visibility="Hidden">
@@ -317,15 +317,15 @@
                                     <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE711;" ToolTip="Remove" Click="OnRemove" />
                                 </StackPanel>
                                 <Border x:Name="DropAbove" Grid.ColumnSpan="4" Height="2" Margin="0,-8,0,0" VerticalAlignment="Top"
-                                        Background="{StaticResource BrandGradientHorizontal}" Visibility="Collapsed" />
+                                        Background="{DynamicResource BrandGradientHorizontal}" Visibility="Collapsed" />
                                 <Border x:Name="DropBelow" Grid.ColumnSpan="4" Height="2" Margin="0,0,0,-8" VerticalAlignment="Bottom"
-                                        Background="{StaticResource BrandGradientHorizontal}" Visibility="Collapsed" />
+                                        Background="{DynamicResource BrandGradientHorizontal}" Visibility="Collapsed" />
                             </Grid>
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding IsCurrent}" Value="True">
                                     <Setter TargetName="Num" Property="Visibility" Value="Collapsed" />
                                     <Setter TargetName="NowGlyph" Property="Visibility" Value="Visible" />
-                                    <Setter TargetName="TitleText" Property="Foreground" Value="{StaticResource BrandBrush}" />
+                                    <Setter TargetName="TitleText" Property="Foreground" Value="{DynamicResource BrandBrush}" />
                                     <Setter TargetName="TitleText" Property="FontWeight" Value="SemiBold" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsAudio}" Value="True">
@@ -333,11 +333,11 @@
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding HasError}" Value="True">
                                     <Setter TargetName="SubText" Property="Text" Value="{Binding Error}" />
-                                    <Setter TargetName="SubText" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    <Setter TargetName="SubText" Property="Foreground" Value="{DynamicResource DangerBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Missing}" Value="True">
                                     <Setter TargetName="SubText" Property="Text" Value="File not found" />
-                                    <Setter TargetName="SubText" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    <Setter TargetName="SubText" Property="Foreground" Value="{DynamicResource DangerBrush}" />
                                     <Setter TargetName="Row" Property="Opacity" Value="0.6" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding DropHint}" Value="Above">
@@ -356,21 +356,21 @@
 
                 <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"
                             Visibility="{Binding Player.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8FD;" FontSize="22" Foreground="{StaticResource FaintBrush}" HorizontalAlignment="Center" />
-                    <TextBlock Text="Your playlist is empty" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,4" HorizontalAlignment="Center" />
-                    <TextBlock Text="Click + or drop files here" Foreground="{StaticResource FaintBrush}" FontSize="12" HorizontalAlignment="Center" />
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8FD;" FontSize="22" Foreground="{DynamicResource FaintBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="Your playlist is empty" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,4" HorizontalAlignment="Center" />
+                    <TextBlock Text="Click + or drop files here" Foreground="{DynamicResource FaintBrush}" FontSize="12" HorizontalAlignment="Center" />
                 </StackPanel>
 
                 <!-- Shut down when the playlist ends -->
                 <Border Grid.Row="2" Margin="12,6,12,12" Padding="14,12" CornerRadius="10" BorderThickness="1">
                     <Border.Style>
                         <Style TargetType="Border">
-                            <Setter Property="Background" Value="{StaticResource ChipBrush}" />
-                            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
+                            <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource StrokeBrush}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Player.ShutdownWhenDone}" Value="True">
-                                    <Setter Property="Background" Value="{StaticResource BrandSoftBrush}" />
-                                    <Setter Property="BorderBrush" Value="{StaticResource BrandBrush}" />
+                                    <Setter Property="Background" Value="{DynamicResource BrandSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
