@@ -1,0 +1,257 @@
+<UserControl x:Class="Snag.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="780" Margin="22,2,22,28">
+
+            <!-- ============ Snag updates ============ -->
+            <Border Style="{StaticResource Card}" Padding="24">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="44" Height="44" CornerRadius="12" Background="{StaticResource BrandGradient}">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="18" Foreground="White" HorizontalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding AppVersionText}" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding AppUpdateStatus}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,3,0,0" />
+                        </StackPanel>
+                        <Grid Grid.Column="2" VerticalAlignment="Center">
+                            <Button Style="{StaticResource GhostButton}" Command="{Binding CheckAppUpdateCommand}"
+                                    Visibility="{Binding HasAppUpdate, Converter={StaticResource Vis}, ConverterParameter=!}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" />
+                                    <TextBlock Text="Check for updates" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource PrimaryButton}" Command="{Binding InstallAppUpdateCommand}"
+                                    Visibility="{Binding HasAppUpdate, Converter={StaticResource Vis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" />
+                                    <TextBlock Text="Download and install" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+                    <StackPanel Margin="0,16,0,0" Visibility="{Binding AppUpdateDownloading, Converter={StaticResource Vis}}">
+                        <Grid>
+                            <TextBlock Text="{Binding AppUpdateProgress, StringFormat={}{0:0}%}" FontSize="12.5" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                            <Button Style="{StaticResource GhostButton}" Height="28" Content="Cancel" HorizontalAlignment="Right" Command="{Binding CancelAppUpdateCommand}" />
+                        </Grid>
+                        <ProgressBar Style="{StaticResource SlimProgress}" Margin="0,8,0,0" Value="{Binding AppUpdateProgress, Mode=OneWay}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding AppUpdateError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,12,0,0"
+                               Visibility="{Binding AppUpdateError, Converter={StaticResource Vis}}" />
+
+                    <!-- What's new in the available version -->
+                    <Border Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1" CornerRadius="10"
+                            Padding="16,12" Margin="0,16,0,0" Visibility="{Binding HasAppUpdate, Converter={StaticResource Vis}}">
+                        <StackPanel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Height="28" Command="{Binding OpenReleaseNotesCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="View on GitHub" FontSize="12" />
+                                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE8A7;" FontSize="11" Margin="7,0,0,0" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="WHAT'S NEW" Style="{StaticResource Label}" Margin="0" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0"
+                                          Visibility="{Binding AppUpdate.Notes, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
+                                <TextBlock Text="{Binding AppUpdate.Notes}" TextWrapping="Wrap" FontSize="12.5" LineHeight="19" />
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Border>
+
+                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CheckAppUpdates}" Margin="0,18,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Tell me when there's a new version" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0"
+                                       Text="Snag looks for a new release when it starts. Nothing is downloaded until you choose to install it." />
+                        </StackPanel>
+                    </CheckBox>
+                </StackPanel>
+            </Border>
+
+            <!-- ============ Download engine ============ -->
+            <Border Style="{StaticResource Card}" Padding="24" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="Download engine" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Muted}" Margin="0,5,0,0"
+                               Text="Snag drives these open-source tools. They live in your user folder so they can update without admin rights, and are only accepted when their SHA-256 checksum matches the one their publisher posts." />
+
+                    <ItemsControl ItemsSource="{Binding ToolRows}" Margin="0,16,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource StrokeBrush}" BorderThickness="0,1,0,0" Padding="0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="38" Height="38" CornerRadius="10" Background="{StaticResource ChipBrush}">
+                                            <TextBlock Style="{StaticResource Glyph}" Text="{Binding Glyph}" HorizontalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13.5" />
+                                            <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Style="{StaticResource Chip}" Margin="0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock x:Name="StateGlyph" Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="11" Foreground="{StaticResource SuccessBrush}" />
+                                                <TextBlock Text="{Binding Version}" FontSize="12" Margin="7,0,0,0" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Installed}" Value="False">
+                                        <Setter TargetName="StateGlyph" Property="Text" Value="&#xE783;" />
+                                        <Setter TargetName="StateGlyph" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <StackPanel Margin="0,6,0,0" Visibility="{Binding ToolsBusy, Converter={StaticResource Vis}}">
+                        <Grid>
+                            <TextBlock Text="{Binding ToolsStatus}" FontSize="12.5" />
+                            <TextBlock Text="{Binding ToolsProgress, StringFormat={}{0:0}%}" FontSize="12.5" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <ProgressBar Style="{StaticResource SlimProgress}" Margin="0,8,0,0" Value="{Binding ToolsProgress, Mode=OneWay}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding ToolsError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Visibility="{Binding ToolsError, Converter={StaticResource Vis}}" />
+
+                    <WrapPanel Margin="0,16,0,0">
+                        <Button Style="{StaticResource GhostButton}" Margin="0,0,8,8" Command="{Binding CheckUpdatesCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" />
+                                <TextBlock Text="Check for updates" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Margin="0,0,8,8" Command="{Binding ReinstallToolsCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" />
+                                <TextBlock Text="Re-download all" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Margin="0,0,8,8" Command="{Binding OpenToolsFolderCommand}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE838;" />
+                                <TextBlock Text="Open tools folder" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelToolsCommand}"
+                                Visibility="{Binding ToolsBusy, Converter={StaticResource Vis}}" />
+                    </WrapPanel>
+
+                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AutoUpdateYtDlp}" Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Keep yt-dlp up to date" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0"
+                                       Text="YouTube changes often. Snag checks for a new yt-dlp at most once a day, when it starts." />
+                        </StackPanel>
+                    </CheckBox>
+                </StackPanel>
+            </Border>
+
+            <!-- ============ Downloads ============ -->
+            <Border Style="{StaticResource Card}" Padding="24" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="Downloads" FontSize="16" FontWeight="SemiBold" />
+
+                    <TextBlock Text="SAVE TO" Style="{StaticResource Label}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="12,0" Height="38">
+                            <DockPanel>
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" Foreground="{StaticResource MutedBrush}" />
+                                <TextBlock Text="{Binding OutputFolder}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="12.5" />
+                            </DockPanel>
+                        </Border>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButton}" Height="38" Margin="8,0,0,0" Content="Change" Command="{Binding BrowseFolderCommand}" />
+                        <Button Grid.Column="2" Style="{StaticResource GhostButton}" Height="38" Margin="8,0,0,0" Content="Open" Command="{Binding OpenFolderCommand}" />
+                    </Grid>
+
+                    <Grid Margin="0,22,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Downloads at the same time" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" Text="More is faster for playlists, but YouTube may slow you down." />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1" Width="90" ItemsSource="{Binding ParallelOptions}" SelectedItem="{Binding MaxParallel}" />
+                    </Grid>
+
+                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding NumberPlaylistItems}" Margin="0,22,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Number playlist files" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" Text="Keeps playlist order in your folder, e.g. &quot;03 - Song title.mp3&quot;." />
+                        </StackPanel>
+                    </CheckBox>
+                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding AddDownloadsToPlayer}" Margin="0,18,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Add finished downloads to the player" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,2,0,0" Text="Each one is added to the end of the player's playlist." />
+                        </StackPanel>
+                    </CheckBox>
+                </StackPanel>
+            </Border>
+
+            <!-- ============ Safety ============ -->
+            <Border Style="{StaticResource Card}" Padding="24" Margin="0,16,0,0">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xEA18;" FontSize="16" Foreground="{StaticResource BrandBrush}" />
+                        <TextBlock Text="Privacy &amp; safety" FontSize="16" FontWeight="SemiBold" Margin="10,0,0,0" />
+                    </StackPanel>
+                    <ItemsControl Margin="0,14,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" FontSize="11" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Top" Margin="0,3,0,0" />
+                                    <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" FontSize="12.5" Margin="12,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.Items>
+                            <sys:String>Only YouTube, TikTok and Instagram links are accepted. They're cleaned up and handed to yt-dlp as data, never through a command shell.</sys:String>
+                            <sys:String>yt-dlp runs with your config files and plugins ignored, so nothing outside Snag can change what it does.</sys:String>
+                            <sys:String>YouTube's player code runs inside Deno's sandbox, with no access to your files or network. yt-dlp isn't allowed to fetch extra code.</sys:String>
+                            <sys:String>Tools come only from their official releases and are rejected unless their SHA-256 checksum matches. Snag's own updates are checked the same way.</sys:String>
+                            <sys:String>Every process Snag starts is closed when Snag closes, even if it crashes.</sys:String>
+                            <sys:String>No accounts, cookies or telemetry. Settings stay in %LOCALAPPDATA%\Snag.</sys:String>
+                            <sys:String>Shut down only happens when you switch it on, resets every launch, and always gives you 60 seconds to cancel.</sys:String>
+                        </ItemsControl.Items>
+                    </ItemsControl>
+                    <TextBlock Style="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"
+                               Text="Only download videos you own or have permission to save, and follow each site's Terms of Service." />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Foreground="{StaticResource FaintBrush}" FontSize="12" HorizontalAlignment="Center" Margin="0,20,0,0">
+                <Run Text="{Binding AppVersionText, Mode=OneWay}" /><Run Text="  ·  a yt-dlp front end" />
+            </TextBlock>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

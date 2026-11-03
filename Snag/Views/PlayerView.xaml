@@ -1,0 +1,396 @@
+<UserControl x:Class="Snag.Views.PlayerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AllowDrop="True" DragOver="OnFilesDragOver" Drop="OnFilesDrop">
+    <Grid x:Name="Layout" Margin="22,2,22,22">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="GapColumn" Width="18" />
+            <ColumnDefinition x:Name="ListColumn" Width="370" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============ Video + controls ============ -->
+        <Grid x:Name="StageHost">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!--
+                The stage. Exactly one of its layers is shown at a time (PlayerView.UpdateSurface decides):
+                nothing loaded, loading, video, song artwork, playlist finished, or an error.
+                Click toggles play/pause, double-click toggles full screen.
+            -->
+            <Border x:Name="Stage" CornerRadius="12" MouseLeftButtonDown="OnStageMouseDown">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Player.HasCurrent}" Value="True">
+                                <Setter Property="Background" Value="Black" />
+                                <Setter Property="BorderThickness" Value="0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <!-- Video frames from the VLC engine -->
+                    <Image x:Name="VideoImage" Stretch="Uniform" Visibility="Collapsed" RenderOptions.BitmapScalingMode="Linear" />
+
+                    <!-- Songs: artwork instead of a black box -->
+                    <Grid x:Name="AudioArt" Visibility="Collapsed" ClipToBounds="True">
+                        <Border Opacity="0.35" Margin="-60">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Player.Current.ArtworkUrl, Converter={StaticResource Img}}" Stretch="UniformToFill" />
+                            </Border.Background>
+                            <Border.Effect>
+                                <BlurEffect Radius="60" />
+                            </Border.Effect>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <Grid Width="230" Height="230">
+                                <Border CornerRadius="18" Background="{StaticResource BrandGradient}">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8D6;" FontSize="68" Foreground="White" HorizontalAlignment="Center" />
+                                </Border>
+                                <Border CornerRadius="18">
+                                    <Border.Background>
+                                        <ImageBrush ImageSource="{Binding Player.Current.ArtworkUrl, Converter={StaticResource Img}}" Stretch="UniformToFill" />
+                                    </Border.Background>
+                                </Border>
+                            </Grid>
+                            <TextBlock Text="{Binding Player.Current.Title}" FontSize="19" FontWeight="SemiBold" Foreground="White"
+                                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="540" Margin="0,24,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Nothing loaded -->
+                    <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <Border Width="70" Height="70" CornerRadius="20" Background="{StaticResource BrandSoftBrush}" HorizontalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="27" Foreground="{StaticResource BrandBrush}" HorizontalAlignment="Center" Margin="3,0,0,0" />
+                        </Border>
+                        <TextBlock Text="Nothing playing" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,20,0,6" />
+                        <TextBlock Text="Add videos or songs from your PC, or download something; it can land here automatically."
+                                   Style="{StaticResource Muted}" FontSize="13" TextAlignment="Center" MaxWidth="380" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                            <Button Style="{StaticResource PrimaryButton}" Click="OnAddFiles">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE710;" />
+                                    <TextBlock Text="Add files" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource GhostButton}" Height="40" Margin="10,0,0,0" Command="{Binding Player.TogglePlayCommand}"
+                                    Visibility="{Binding Player.Count, Converter={StaticResource Vis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" />
+                                    <TextBlock Text="Play playlist" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Opening a video (only shown if the first frame takes a moment) -->
+                    <StackPanel x:Name="LoadingState" Visibility="Collapsed" Width="180" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+                        <ProgressBar Style="{StaticResource SlimProgress}" IsIndeterminate="True" />
+                        <TextBlock Text="Opening…" Foreground="{StaticResource MutedBrush}" FontSize="12.5" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                    </StackPanel>
+
+                    <!-- Paused: a big play symbol over the picture -->
+                    <Border x:Name="PausedBadge" Visibility="Collapsed" Width="84" Height="84" CornerRadius="42" Background="#99000000"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" FontSize="34" Foreground="White" HorizontalAlignment="Center" Margin="5,0,0,0" />
+                    </Border>
+
+                    <!-- The playlist ran out -->
+                    <Border x:Name="FinishedState" Visibility="Collapsed">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <Border Width="70" Height="70" CornerRadius="20" Background="{StaticResource BrandSoftBrush}" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" FontSize="26" Foreground="{StaticResource BrandBrush}" HorizontalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="Playlist finished" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,6" />
+                            <TextBlock Text="{Binding Player.Count, StringFormat='All {0} items have played.'}" Foreground="{StaticResource MutedBrush}" FontSize="13" HorizontalAlignment="Center" />
+                            <Button Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" HorizontalAlignment="Center" Command="{Binding Player.ReplayCommand}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" />
+                                    <TextBlock Text="Play again" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Something wouldn't play -->
+                    <StackPanel x:Name="ErrorState" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460">
+                        <Border Width="70" Height="70" CornerRadius="20" Background="#33FF8080" HorizontalAlignment="Center">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE783;" FontSize="26" Foreground="{StaticResource DangerBrush}" HorizontalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Couldn't play this file" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,6" />
+                        <TextBlock Text="{Binding Player.Current.Title}" Foreground="White" FontSize="13" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Player.Current.Error}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                            <Button Style="{StaticResource GhostButton}" Height="38" Click="OnRemoveCurrent">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE711;" />
+                                    <TextBlock Text="Remove from playlist" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource GhostButton}" Height="38" Margin="10,0,0,0" Click="OnShowCurrent">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" />
+                                    <TextBlock Text="Show in folder" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- In full screen this becomes a fading overlay on top of the video -->
+            <Border x:Name="Controls" Grid.Row="1" Padding="4,14,4,0">
+                <Border.Resources>
+                    <LinearGradientBrush x:Key="OverlayScrim" StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#00000000" Offset="0" />
+                        <GradientStop Color="#99000000" Offset="0.45" />
+                        <GradientStop Color="#E6000000" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Resources>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="54" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="54" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ElapsedText" Text="0:00" FontSize="12" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                    <Slider x:Name="SeekBar" Grid.Column="1" Style="{StaticResource MediaSlider}" Minimum="0" Maximum="1" VerticalAlignment="Center"
+                            ValueChanged="OnSeekChanged" />
+                    <TextBlock x:Name="TotalText" Grid.Column="2" Text="0:00" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                               VerticalAlignment="Center" TextAlignment="Right" />
+                </Grid>
+                <Grid Grid.Row="1" Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="{Binding Player.Current.Title, FallbackValue='Nothing playing', TargetNullValue='Nothing playing'}"
+                                   FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Player.PositionText}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,3,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Shuffle: purple with a dot when on -->
+                        <Button Width="40" Height="40" Margin="0,0,10,0" ToolTip="{Binding Player.ShuffleTip}" Command="{Binding Player.ToggleShuffleCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Player.Shuffle}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource BrandBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                            <Grid>
+                                <TextBlock Text="&#xE8B1;" FontSize="15" HorizontalAlignment="Center" />
+                                <Ellipse Width="4" Height="4" Fill="{StaticResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
+                                         Visibility="{Binding Player.Shuffle, Converter={StaticResource Vis}}" />
+                            </Grid>
+                        </Button>
+                        <Button Style="{StaticResource IconButton}" Width="42" Height="42" FontSize="16" Content="&#xE892;"
+                                Command="{Binding Player.PreviousCommand}" ToolTip="Previous (P)" />
+                        <Button Style="{StaticResource PlayButton}" Margin="12,0" Content="{Binding Player.PlayGlyph}"
+                                Command="{Binding Player.TogglePlayCommand}" ToolTip="Play / pause (Space)" />
+                        <Button Style="{StaticResource IconButton}" Width="42" Height="42" FontSize="16" Content="&#xE893;"
+                                Command="{Binding Player.NextCommand}" ToolTip="Next (N)" />
+                        <!-- Repeat: off → playlist → this item -->
+                        <Button Width="40" Height="40" Margin="10,0,0,0" ToolTip="{Binding Player.RepeatTip}" Command="{Binding Player.CycleRepeatCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Player.IsRepeatOn}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource BrandBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                            <Grid>
+                                <TextBlock Text="{Binding Player.RepeatGlyph}" FontSize="15" HorizontalAlignment="Center" />
+                                <Ellipse Width="4" Height="4" Fill="{StaticResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
+                                         Visibility="{Binding Player.IsRepeatOn, Converter={StaticResource Vis}}" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" Foreground="{StaticResource BrandBrush}" Margin="0,0,10,0"
+                                   ToolTip="Shuts down when the playlist ends"
+                                   Visibility="{Binding Player.ShutdownWhenDone, Converter={StaticResource Vis}}" />
+                        <Button Style="{StaticResource IconButton}" Content="{Binding Player.VolumeGlyph}" Command="{Binding Player.ToggleMuteCommand}" ToolTip="Mute (M)" />
+                        <Slider Width="110" Style="{StaticResource MediaSlider}" Minimum="0" Maximum="1" Value="{Binding Player.Volume}"
+                                VerticalAlignment="Center" Margin="4,0,8,0" ToolTip="Volume (Up / Down)" />
+                        <Button Style="{StaticResource IconButton}" Content="{Binding FullscreenGlyph}" Command="{Binding ToggleFullscreenCommand}"
+                                ToolTip="Full screen (F, Esc to leave)" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ============ Playlist ============ -->
+        <Border x:Name="ListPanel" Grid.Column="2" Style="{StaticResource Card}" Padding="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Margin="18,14,12,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Playlist" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="Drag to reorder · drop files to add" Foreground="{StaticResource FaintBrush}" FontSize="11.5" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Style="{StaticResource IconButton}" Content="&#xE710;" ToolTip="Add files" Click="OnAddFiles" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE838;" ToolTip="Add a folder" Click="OnAddFolder" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Clear the playlist" Click="OnClearPlaylist" />
+                    </StackPanel>
+                </Grid>
+
+                <ListBox x:Name="PlaylistBox" Grid.Row="1" Style="{StaticResource PlainList}" ItemContainerStyle="{StaticResource SelectableItem}"
+                         ItemsSource="{Binding Player.Items}" Margin="8,0,8,4" AllowDrop="True"
+                         PreviewMouseLeftButtonDown="OnListMouseDown" PreviewMouseMove="OnListMouseMove"
+                         DragOver="OnListDragOver" DragLeave="OnListDragLeave" Drop="OnListDrop"
+                         MouseDoubleClick="OnListDoubleClick" PreviewKeyDown="OnListKeyDown" ContextMenuOpening="OnListContextMenuOpening">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Play" Tag="play" Click="OnMenuClick" />
+                            <MenuItem Header="Show in folder" Tag="show" Click="OnMenuClick" />
+                            <Separator />
+                            <MenuItem Header="Move to top" Tag="top" Click="OnMenuClick" />
+                            <MenuItem Header="Move up" Tag="up" Click="OnMenuClick" InputGestureText="Alt+Up" />
+                            <MenuItem Header="Move down" Tag="down" Click="OnMenuClick" InputGestureText="Alt+Down" />
+                            <MenuItem Header="Move to bottom" Tag="bottom" Click="OnMenuClick" />
+                            <Separator />
+                            <MenuItem Header="Remove from playlist" Tag="remove" Click="OnMenuClick" InputGestureText="Del" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid x:Name="Row" Background="Transparent">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="26" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="Num" Text="{Binding Number}" Foreground="{StaticResource FaintBrush}" FontSize="12"
+                                           VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="NowGlyph" Style="{StaticResource Glyph}" Text="&#xE768;" Foreground="{StaticResource BrandBrush}" FontSize="11"
+                                           HorizontalAlignment="Center" Visibility="Collapsed" />
+                                <Grid Grid.Column="1" Width="64" Height="36" Margin="4,0,0,0">
+                                    <Border CornerRadius="5" Background="{StaticResource TileBrush}">
+                                        <TextBlock x:Name="KindGlyph" Style="{StaticResource Glyph}" Text="&#xE714;" FontSize="14"
+                                                   Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" />
+                                    </Border>
+                                    <Border CornerRadius="5">
+                                        <Border.Background>
+                                            <ImageBrush ImageSource="{Binding ArtworkUrl, Converter={StaticResource Img}}" Stretch="UniformToFill" />
+                                        </Border.Background>
+                                    </Border>
+                                </Grid>
+                                <StackPanel Grid.Column="2" Margin="10,0,6,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}" />
+                                    <TextBlock x:Name="SubText" Text="{Binding Kind}" FontSize="11.5" Foreground="{StaticResource FaintBrush}"
+                                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <StackPanel x:Name="Actions" Grid.Column="3" Orientation="Horizontal" Visibility="Hidden">
+                                    <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE70E;" ToolTip="Move up" Click="OnMoveUp" />
+                                    <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE70D;" ToolTip="Move down" Click="OnMoveDown" />
+                                    <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE711;" ToolTip="Remove" Click="OnRemove" />
+                                </StackPanel>
+                                <Border x:Name="DropAbove" Grid.ColumnSpan="4" Height="2" Margin="0,-8,0,0" VerticalAlignment="Top"
+                                        Background="{StaticResource BrandGradientHorizontal}" Visibility="Collapsed" />
+                                <Border x:Name="DropBelow" Grid.ColumnSpan="4" Height="2" Margin="0,0,0,-8" VerticalAlignment="Bottom"
+                                        Background="{StaticResource BrandGradientHorizontal}" Visibility="Collapsed" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                    <Setter TargetName="Num" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="NowGlyph" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="TitleText" Property="Foreground" Value="{StaticResource BrandBrush}" />
+                                    <Setter TargetName="TitleText" Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsAudio}" Value="True">
+                                    <Setter TargetName="KindGlyph" Property="Text" Value="&#xE8D6;" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasError}" Value="True">
+                                    <Setter TargetName="SubText" Property="Text" Value="{Binding Error}" />
+                                    <Setter TargetName="SubText" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Missing}" Value="True">
+                                    <Setter TargetName="SubText" Property="Text" Value="File not found" />
+                                    <Setter TargetName="SubText" Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    <Setter TargetName="Row" Property="Opacity" Value="0.6" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding DropHint}" Value="Above">
+                                    <Setter TargetName="DropAbove" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding DropHint}" Value="Below">
+                                    <Setter TargetName="DropBelow" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                    <Setter TargetName="Actions" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"
+                            Visibility="{Binding Player.Count, Converter={StaticResource Vis}, ConverterParameter=!}">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE8FD;" FontSize="22" Foreground="{StaticResource FaintBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="Your playlist is empty" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,4" HorizontalAlignment="Center" />
+                    <TextBlock Text="Click + or drop files here" Foreground="{StaticResource FaintBrush}" FontSize="12" HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Shut down when the playlist ends -->
+                <Border Grid.Row="2" Margin="12,6,12,12" Padding="14,12" CornerRadius="10" BorderThickness="1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{StaticResource ChipBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Player.ShutdownWhenDone}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource BrandSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource BrandBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding Player.ShutdownWhenDone}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" FontSize="16" VerticalAlignment="Top" Margin="0,1,0,0" />
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                <TextBlock Text="Shut down when playlist ends" FontWeight="SemiBold" FontSize="13" />
+                                <TextBlock Style="{StaticResource Muted}" FontSize="11.5" Margin="0,3,0,0"
+                                           Text="After the last item finishes playing, your PC turns off. You'll get 60 seconds to cancel." />
+                            </StackPanel>
+                        </Grid>
+                    </CheckBox>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

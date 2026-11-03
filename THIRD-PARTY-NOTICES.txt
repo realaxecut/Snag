@@ -1,0 +1,21 @@
+Snag uses or downloads the following open-source software.
+
+Shipped with Snag
+-----------------
+LibVLCSharp 3.10.2 - LGPL-2.1-or-later
+  Copyright (c) VideoLAN and contributors
+  Source: https://code.videolan.org/videolan/LibVLCSharp
+  Snag uses it as an unmodified, separately replaceable library (LibVLCSharp.dll).
+
+.NET runtime and WPF - MIT License
+  Copyright (c) .NET Foundation and contributors
+  Source: https://github.com/dotnet/runtime, https://github.com/dotnet/wpf
+
+Downloaded by Snag on first run (from their publishers, checksum-verified)
+-----------------------------------------------------------------------
+yt-dlp - The Unlicense - https://github.com/yt-dlp/yt-dlp
+FFmpeg (yt-dlp/FFmpeg-Builds, GPL build) - GPL-3.0-or-later - https://github.com/yt-dlp/FFmpeg-Builds
+Deno - MIT License - https://github.com/denoland/deno
+libVLC and its plugins (VLC media player) - LGPL-2.1-or-later and GPL-2.0-or-later - https://www.videolan.org/vlc/
+
+These tools are stored in %LOCALAPPDATA%\Snag\tools and keep their own licenses.

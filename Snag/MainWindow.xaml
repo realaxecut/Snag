@@ -1,0 +1,153 @@
+<Window x:Class="Snag.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Snag.Views"
+        xmlns:controls="clr-namespace:Snag.Controls"
+        Title="Snag" Icon="/Assets/snag.ico"
+        Width="1240" Height="820" MinWidth="1000" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True" DragOver="OnWindowDragOver" Drop="OnWindowDrop"
+        PreviewKeyDown="OnPreviewKeyDown">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Top bar -->
+        <Grid Margin="22,12,22,12" Visibility="{Binding IsFullscreen, Converter={StaticResource Vis}, ConverterParameter=!}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="32" Height="32" CornerRadius="9" Background="{StaticResource BrandGradient}">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" Foreground="White" FontSize="15" HorizontalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Snag" FontSize="19" FontWeight="SemiBold" Margin="11,0,0,1" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <Border Grid.Column="1" Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+                    CornerRadius="21" Padding="3">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
+                                 IsChecked="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Download}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" />
+                            <TextBlock Text="Download" Margin="8,0,0,0" />
+                            <Border Style="{StaticResource CountBadge}" Visibility="{Binding ActiveCount, Converter={StaticResource Vis}}">
+                                <TextBlock Text="{Binding ActiveCount}" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
+                                 IsChecked="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Player}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" />
+                            <TextBlock Text="Player" Margin="8,0,0,0" />
+                            <Border Style="{StaticResource CountBadge}" Visibility="{Binding Player.Count, Converter={StaticResource Vis}}">
+                                <TextBlock Text="{Binding Player.Count}" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
+                                 IsChecked="{Binding Page, Converter={StaticResource Is}, ConverterParameter=History}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE81C;" />
+                            <TextBlock Text="History" Margin="8,0,0,0" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
+                                 IsChecked="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Settings}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE713;" />
+                            <TextBlock Text="Settings" Margin="8,0,0,0" />
+                            <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource BrandGradient}" Margin="7,0,0,0"
+                                    ToolTip="A new version of Snag is available"
+                                    Visibility="{Binding HasAppUpdate, Converter={StaticResource Vis}}" />
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </Border>
+
+            <!-- Now playing -->
+            <Border Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
+                    Background="{StaticResource ChipBrush}" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+                    CornerRadius="19" Padding="4,3,14,3" ToolTip="Open the player"
+                    Visibility="{Binding Player.HasCurrent, Converter={StaticResource Vis}}">
+                <Border.InputBindings>
+                    <MouseBinding MouseAction="LeftClick" Command="{Binding GoToPlayerCommand}" />
+                </Border.InputBindings>
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource IconButton}" Width="28" Height="28" FontSize="12"
+                            Content="{Binding Player.PlayGlyph}" Command="{Binding Player.TogglePlayCommand}" ToolTip="Play / pause" />
+                    <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" FontSize="11" Foreground="{StaticResource BrandBrush}"
+                                   Margin="0,0,7,0" ToolTip="Will shut down when the playlist ends"
+                                   Visibility="{Binding Player.ShutdownWhenDone, Converter={StaticResource Vis}}" />
+                        <TextBlock Text="{Binding Player.Current.Title}" MaxWidth="230" TextTrimming="CharacterEllipsis" FontSize="12.5" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Pages -->
+        <Grid Grid.Row="1">
+            <views:DownloadView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Download}" />
+            <views:PlayerView x:Name="PlayerPane" Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Player}" />
+            <views:HistoryView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=History}" />
+            <views:SettingsView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Settings}" />
+        </Grid>
+
+        <!-- Toast -->
+        <Border Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" Padding="16,11"
+                CornerRadius="10" Background="#F2303040" BorderBrush="{StaticResource StrokeBrush}" BorderThickness="1"
+                IsHitTestVisible="False" Visibility="{Binding ToastText, Converter={StaticResource Vis}}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.45" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" Foreground="{StaticResource BrandBrush}" />
+                <TextBlock Text="{Binding ToastText}" Margin="10,0,0,0" FontSize="13" />
+            </StackPanel>
+        </Border>
+
+        <!-- Shutdown countdown -->
+        <Grid Grid.RowSpan="2" Background="{StaticResource ScrimBrush}"
+              Visibility="{Binding Shutdown.IsOpen, Converter={StaticResource Vis}}">
+            <Border Style="{StaticResource Card}" Background="{StaticResource SurfaceBrush}" Width="440" Padding="32"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="8" Opacity="0.5" />
+                </Border.Effect>
+                <StackPanel>
+                    <Grid Width="116" Height="116" HorizontalAlignment="Center">
+                        <controls:Ring Value="{Binding Shutdown.Fraction}" Thickness="6" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Shutdown.SecondsLeft}" FontSize="36" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Text="seconds" Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Playlist finished" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,22,0,6" />
+                    <TextBlock Text="{Binding Shutdown.Message}" Style="{StaticResource Muted}" FontSize="13.5" TextAlignment="Center" />
+                    <TextBlock Text="{Binding Shutdown.Warning}" Foreground="{StaticResource DangerBrush}" TextAlignment="Center" TextWrapping="Wrap"
+                               Margin="0,10,0,0" Visibility="{Binding Shutdown.Warning, Converter={StaticResource Vis}}" />
+                    <Grid Margin="0,26,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="CancelShutdownButton" Style="{StaticResource PrimaryButton}" Height="44"
+                                Content="Cancel shutdown" Command="{Binding Shutdown.CancelCommand}" />
+                        <Button Grid.Column="2" Style="{StaticResource GhostButton}" Height="44"
+                                Content="Shut down now" Command="{Binding Shutdown.ShutDownNowCommand}" />
+                    </Grid>
+                    <TextBlock Text="Press Esc to cancel" Foreground="{StaticResource FaintBrush}" FontSize="11.5" HorizontalAlignment="Center" Margin="0,14,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
