@@ -10,7 +10,7 @@ using Snag.Services;
 
 namespace Snag.ViewModels;
 
-public enum AppPage { Download, Player, History, Settings }
+public enum AppPage { Download, Player, Playlists, History, Settings }
 
 public enum PreviewState { Empty, Loading, Video, Playlist }
 
@@ -178,6 +178,8 @@ public sealed class MainViewModel : ObservableObject
         DeleteHistoryCommand = new RelayCommand<HistoryItemViewModel>(DeleteHistory);
         ClearHistoryCommand = new RelayCommand(ClearHistory, () => History.Count > 0);
 
+        Playlists = new PlaylistsViewModel(Player, () => History, ShowToast, page => Page = page);
+
         RefreshTools();
         RefreshQueue();
         RefreshHistorySummary();
@@ -189,6 +191,7 @@ public sealed class MainViewModel : ObservableObject
     // ---------------------------------------------------------------- shared state
 
     public PlayerViewModel Player { get; }
+    public PlaylistsViewModel Playlists { get; }
     public ShutdownViewModel Shutdown { get; }
     public ObservableCollection<DownloadItemViewModel> Queue { get; } = [];
     public IReadOnlyList<int> ParallelOptions { get; } = [1, 2, 3, 4];
@@ -774,6 +777,7 @@ public sealed class MainViewModel : ObservableObject
         _analyzeCts?.Cancel();
         _toolsCts?.Cancel();
         Save();
+        Playlists.SaveNow();
     }
 
     public void ShowToast(string message)

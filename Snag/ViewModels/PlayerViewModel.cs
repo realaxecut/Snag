@@ -61,6 +61,22 @@ public sealed class PlaylistItem : ObservableObject
     }
 
     public bool HasError => Error is not null;
+
+    /// <summary>
+    /// Files from the PC have no thumbnail: gives them a frame from halfway through the video (or the song's
+    /// cover art) instead of a placeholder. Also redoes pictures whose cached file has gone. True if it changed.
+    /// </summary>
+    public async Task<bool> LoadArtworkAsync()
+    {
+        if (Missing) return false;
+        if (ArtworkUrl is { } art && !(ThumbnailCache.IsCachedPath(art) && !File.Exists(art))) return false;
+        var picture = await FrameGrabber.GetAsync(Path, IsAudio);
+        if (picture is null) return false;
+        ArtworkUrl = picture;
+        return true;
+    }
+
+    public PlaylistEntryDto ToDto() => new() { Path = Path, Title = Title, ArtworkUrl = ArtworkUrl };
 }
 
 /// <summary>
@@ -70,12 +86,6 @@ public sealed class PlaylistItem : ObservableObject
 /// </summary>
 public sealed class PlayerViewModel : ObservableObject
 {
-    public static readonly string[] MediaExtensions =
-    [
-        ".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".wmv",
-        ".mp3", ".m4a", ".aac", ".wav", ".wma", ".flac", ".ogg", ".opus",
-    ];
-
     private readonly Action _changed;
     private readonly Action<string> _notify;
     private readonly Random _random = new();
@@ -243,16 +253,13 @@ public sealed class PlayerViewModel : ObservableObject
         }
     }
 
-    public static bool IsMedia(string path) =>
-        MediaExtensions.Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
-
     public List<PlaylistItem> AddFiles(IEnumerable<string> paths, int? insertAt = null)
     {
         var added = new List<PlaylistItem>();
         var index = Math.Clamp(insertAt ?? Items.Count, 0, Items.Count);
         foreach (var path in paths)
         {
-            if (!IsMedia(path) || !File.Exists(path) || Find(path) is not null) continue;
+            if (!MediaFiles.IsMedia(path) || !File.Exists(path) || Find(path) is not null) continue;
             var item = new PlaylistItem(path);
             Items.Insert(index++, item);
             added.Add(item);
@@ -269,17 +276,26 @@ public sealed class PlayerViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Files from the PC have no thumbnail: give them a frame from halfway through the video (or the song's
-    /// cover art) instead of a placeholder. Also redoes pictures whose cached file has gone.
+    /// Puts a saved playlist in the player. <paramref name="replace"/>: instead of what's queued, and starts
+    /// playing it; otherwise added to the end. Files already queued aren't added twice. Returns how many were added.
     /// </summary>
+    public int Enqueue(IEnumerable<PlaylistEntryDto> entries, bool replace)
+    {
+        if (replace) Clear();
+        var added = 0;
+        foreach (var entry in entries)
+        {
+            if (Find(entry.Path) is not null) continue;
+            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !File.Exists(entry.Path) });
+            added++;
+        }
+        if (replace) PlayFromStart();
+        return added;
+    }
+
     private async Task EnsureArtworkAsync(PlaylistItem item)
     {
-        if (item.Missing) return;
-        if (item.ArtworkUrl is { } art && !(ThumbnailCache.IsCachedPath(art) && !File.Exists(art))) return;
-        var picture = await FrameGrabber.GetAsync(item.Path, item.IsAudio);
-        if (picture is null || !Items.Contains(item)) return;
-        item.ArtworkUrl = picture;
-        _changed(); // remembered with the playlist
+        if (await item.LoadArtworkAsync() && Items.Contains(item)) _changed(); // remembered with the playlist
     }
 
     public void PlayItem(PlaylistItem item) => PlayItem(item, rememberPrevious: true);
@@ -475,8 +491,7 @@ public sealed class PlayerViewModel : ObservableObject
         Items.Clear();
     }
 
-    public List<PlaylistEntryDto> Snapshot() =>
-        Items.Select(i => new PlaylistEntryDto { Path = i.Path, Title = i.Title, ArtworkUrl = i.ArtworkUrl }).ToList();
+    public List<PlaylistEntryDto> Snapshot() => Items.Select(i => i.ToDto()).ToList();
 
     private PlaylistItem? Find(string path) =>
         Items.FirstOrDefault(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase));

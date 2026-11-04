@@ -491,12 +491,11 @@ public partial class PlayerView : UserControl, IMediaHost
 
     private void OnAddFiles(object sender, RoutedEventArgs e)
     {
-        var pattern = string.Join(';', PlayerViewModel.MediaExtensions.Select(x => "*" + x));
         var dialog = new OpenFileDialog
         {
             Title = "Add to playlist",
             Multiselect = true,
-            Filter = $"Video and audio|{pattern}|All files|*.*",
+            Filter = MediaFiles.DialogFilter,
         };
         if (dialog.ShowDialog(Window.GetWindow(this)) == true) AddPaths(dialog.FileNames, null);
     }
@@ -510,7 +509,7 @@ public partial class PlayerView : UserControl, IMediaHost
     private void OnClearPlaylist(object sender, RoutedEventArgs e)
     {
         if (Player is not { Count: > 0 } p) return;
-        var answer = MessageBox.Show(Window.GetWindow(this)!, $"Remove all {p.Count} items from the playlist? Your files stay where they are.",
+        var answer = MessageBox.Show(Window.GetWindow(this)!, $"Remove all {p.Count} items from the queue? Your files stay where they are.",
             "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (answer == MessageBoxResult.Yes) p.Clear();
     }
@@ -518,43 +517,13 @@ public partial class PlayerView : UserControl, IMediaHost
     private void AddPaths(IEnumerable<string> paths, int? insertAt)
     {
         if (Player is null || _vm is null) return;
-        var added = Player.AddFiles(ExpandFolders(paths), insertAt);
+        var added = Player.AddFiles(MediaFiles.Expand(paths), insertAt);
         _vm.ShowToast(added.Count switch
         {
             0 => "No new playable files were found.",
-            1 => "Added 1 file to the playlist",
-            _ => $"Added {added.Count} files to the playlist",
+            1 => "Added 1 file to the queue",
+            _ => $"Added {added.Count} files to the queue",
         });
-    }
-
-    /// <summary>Folders become their media files (sorted, up to 2,000); files pass through.</summary>
-    private static IEnumerable<string> ExpandFolders(IEnumerable<string> paths)
-    {
-        foreach (var path in paths)
-        {
-            if (File.Exists(path))
-            {
-                yield return path;
-            }
-            else if (Directory.Exists(path))
-            {
-                IEnumerable<string> files;
-                try
-                {
-                    files = Directory.EnumerateFiles(path, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
-                        .Where(PlayerViewModel.IsMedia)
-                        .Order(StringComparer.OrdinalIgnoreCase)
-                        .Take(2000)
-                        .ToList();
-                }
-                catch (Exception ex)
-                {
-                    Log.Error($"Couldn't read folder {path}", ex);
-                    continue;
-                }
-                foreach (var file in files) yield return file;
-            }
-        }
     }
 
     private void OnFilesDragOver(object sender, DragEventArgs e)

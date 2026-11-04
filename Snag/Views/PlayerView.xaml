@@ -254,13 +254,15 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Playlist" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="Queue" FontSize="15" FontWeight="SemiBold" />
                         <TextBlock Text="Drag to reorder · drop files to add" Foreground="{DynamicResource FaintBrush}" FontSize="11.5" Margin="0,2,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button Style="{StaticResource IconButton}" Content="&#xE710;" ToolTip="Add files" Click="OnAddFiles" />
                         <Button Style="{StaticResource IconButton}" Content="&#xE838;" ToolTip="Add a folder" Click="OnAddFolder" />
-                        <Button Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Clear the playlist" Click="OnClearPlaylist" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE74E;" ToolTip="Save the queue as a playlist"
+                                Command="{Binding Playlists.SaveFromPlayerCommand}" />
+                        <Button Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Clear the queue" Click="OnClearPlaylist" />
                     </StackPanel>
                 </Grid>
 

@@ -38,12 +38,22 @@ Snag checks this repository for a new release each time it starts (**Settings �
 - Files you add from your PC get a picture in the playlist: a frame from halfway through the video, or the song's embedded cover art. FFmpeg makes it once, and Snag keeps it in its thumbnail folder.
 - Click the video to pause or play; a play badge shows while it's paused. Songs show their cover art. A spinner appears only if a file takes more than a moment to open.
 - When the playlist ends you get a **Play again** screen. A file that can't be played is skipped. If there's nothing left to skip to, the player says why and offers **Remove from playlist** and **Show in folder**.
-- Reorder the playlist by dragging, with the ↑/↓ buttons, with `Alt+↑/↓`, or from the right-click menu.
+- Reorder the queue by dragging, with the ↑/↓ buttons, with `Alt+↑/↓`, or from the right-click menu. The save button keeps the whole queue as a playlist.
 - **Shuffle** and **Repeat**. Repeat cycles through off → whole playlist → this item.
 - Real full screen (double-click the video or press `F`). The controls float over the video and fade out, along with the cursor, after 2.5 seconds without mouse movement.
 - **Shut down when playlist ends**: once the last item finishes playing, a 60-second countdown appears with a big **Cancel** button (or press `Esc`). Then Windows shuts down normally. Apps with unsaved work can still stop it, because Snag never forces it.
   - The switch is off every time Snag starts.
   - Repeat and this switch turn each other off, since a repeating playlist never ends.
+
+**Playlists**
+- Make as many playlists as you like, and name each one (just type over the name).
+- Fill a playlist three ways:
+  - **Add files** from your PC.
+  - **Add from downloads**: tick any number of downloads from your history and add them all at once.
+  - Drop files or folders onto it.
+- Reorder items with ↑/↓, or remove them. Files that have been moved or deleted are marked.
+- **Play** replaces the player's queue with the playlist and starts it, using your shuffle and repeat settings. **Add to player** puts it at the end of the queue instead.
+- Playlists are saved in `%LOCALAPPDATA%\Snag\playlists.json`. Deleting a playlist never deletes the files in it.
 
 **History**
 - Every finished download, with search (by title, file or link), play, add to the playlist, and show in folder.
@@ -77,7 +87,7 @@ Only download videos you own or have permission to save, and follow each site's 
 | Snag itself | `C:\Program Files\Snag` |
 | Your videos | The **Save to** folder on the Download page (default `Downloads\Snag`) |
 | Tools (yt-dlp, FFmpeg, Deno, VLC engine) | `%LOCALAPPDATA%\Snag\tools` (about 230 MB to download, 450 MB installed) |
-| Settings, player playlist, history, log | `%LOCALAPPDATA%\Snag` |
+| Settings, player queue, saved playlists, history, log | `%LOCALAPPDATA%\Snag` |
 | Thumbnail copies for History (TikTok/Instagram links expire), player pictures for your own files | `%LOCALAPPDATA%\Snag\thumbs` |
 
 The tools live in your user folder, not Program Files, so yt-dlp can update itself without admin prompts. YouTube changes often, so that matters. yt-dlp updates at most once a day when Snag starts, and you can turn that off in **Settings**. The tools' **Check for updates** button also updates Deno and the VLC engine.
