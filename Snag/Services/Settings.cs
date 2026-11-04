@@ -14,6 +14,9 @@ public sealed class AppSettings
     public bool SponsorBlock { get; set; }
     public int MaxParallel { get; set; } = 2;
     public bool AddDownloadsToPlayer { get; set; } = true;
+    public bool CaptionsOn { get; set; }
+    public double CaptionScale { get; set; } = 1.0;
+    public string CaptionBackground { get; set; } = "box";
     public bool AutoUpdateYtDlp { get; set; } = true;
     public bool CheckAppUpdates { get; set; } = true;
     public string Theme { get; set; } = ThemeManager.DefaultThemeId;
@@ -76,6 +79,8 @@ public static class SettingsStore
             settings.OutputFolder = AppPaths.DefaultDownloadsDir();
         settings.Volume = double.IsFinite(settings.Volume) ? Math.Clamp(settings.Volume, 0, 1) : 0.8;
         if (!Enum.IsDefined(settings.Appearance)) settings.Appearance = Appearance.Dark;
+        settings.CaptionScale = double.IsFinite(settings.CaptionScale) ? Math.Clamp(settings.CaptionScale, 0.5, 3) : 1.0;
+        if (settings.CaptionBackground is not ("box" or "solid" or "none")) settings.CaptionBackground = "box";
         if (!ThemeManager.TryParseHex(settings.CustomAccent, out _)) settings.CustomAccent = "#7C5CFF";
         settings.ThemePresets = (settings.ThemePresets ?? [])
             .Where(p => p is not null && ThemeManager.IsPresetId(p.Id) && ThemeManager.TryParseHex(p.Accent, out _) && Enum.IsDefined(p.Appearance))

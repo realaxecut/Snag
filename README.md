@@ -29,7 +29,7 @@ Snag checks this repository for a new release each time it starts (**Settings �
 - Optional **options pop-up** (Settings → Downloads, off by default). After you fetch a link, the video, or the playlist's list, opens in a window with every MP4/MP3 option, while the app blurs behind it. Esc, the ✕ or a click outside closes it, and **Download options** on the preview reopens it.
 - Playlists show every video with a checkbox: select all, none, or just the one you linked. Each playlist gets its own folder, and files can be numbered (`03 - Title.mp4`).
 - Extras: cover art and metadata, English subtitles (MP4), and SponsorBlock to skip sponsor segments.
-- A download queue with live speed and time left, plus cancel, retry, play and show-in-folder. You can run 1–4 downloads at once.
+- A download queue with live speed and time left, plus cancel, retry, play and show-in-folder. You can run 1–4 downloads at once. Once a download is queued, the page clears, ready for the next link.
 
 **Player**
 - Plays your downloads and any video or audio file on your PC: **+** adds files, the folder button adds a whole folder, or drag files onto the player.
@@ -37,6 +37,10 @@ Snag checks this repository for a new release each time it starts (**Settings �
   - Decoding runs on the CPU. Hardware decoding crashed when switching videos quickly, so it's off. A 1080p AV1 video uses most of one CPU core; everything else uses much less.
 - Files you add from your PC get a picture in the playlist: a frame from halfway through the video, or the song's embedded cover art. FFmpeg makes it once, and Snag keeps it in its thumbnail folder.
 - Click the video to pause or play; a play badge shows while it's paused. Songs show their cover art. A spinner appears only if a file takes more than a moment to open.
+- **Captions (CC button, or `C`)** look like YouTube's: white text on a dark box behind each line, sized to the picture, and they move up out of the way of the full-screen controls.
+  - Snag finds captions inside the video (for example from the **English subtitles** download option) and `.srt`/`.vtt` files next to it, such as `Video.en.vtt`. **Add subtitle file…** loads any other file.
+  - The CC menu picks the language and has **Size** (Small, Normal, Large, Huge; also `+`/`-`) and **Background** (Box, Solid, or None with a shadow).
+  - Snag remembers whether you like captions on, and your size and background.
 - When the playlist ends you get a **Play again** screen. A file that can't be played is skipped. If there's nothing left to skip to, the player says why and offers **Remove from playlist** and **Show in folder**.
 - Reorder the queue by dragging, with the ↑/↓ buttons, with `Alt+↑/↓`, or from the right-click menu. The save button keeps the whole queue as a playlist.
 - **Shuffle** and **Repeat**. Repeat cycles through off → whole playlist → this item.
@@ -66,7 +70,7 @@ Snag checks this repository for a new release each time it starts (**Settings �
 - **Custom:** pick any colour with the hue slider, a `#RRGGBB` code or the quick colour dots, and choose whether the window and cards take a faint tint of it. **Save preset** keeps it, with its light/dark mode, as a swatch of its own. A selected preset can be edited or deleted.
 
 ### Keyboard (Player page)
-`Space` play/pause · `←/→` seek 5 s · `↑/↓` volume · `M` mute · `N`/`P` next/previous · `S` shuffle · `R` repeat · `F` full screen · `Esc` leave full screen
+`Space` play/pause · `←/→` seek 5 s · `↑/↓` volume · `M` mute · `N`/`P` next/previous · `S` shuffle · `R` repeat · `C` captions · `+`/`-` caption size · `F` full screen · `Esc` leave full screen
 
 ## How it stays safe
 

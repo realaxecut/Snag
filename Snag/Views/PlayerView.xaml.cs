@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using LibVLCSharp.Shared;
@@ -67,7 +68,13 @@ public partial class PlayerView : UserControl, IMediaHost
         SeekBar.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnSeekEnd), handledEventsToo: true);
         DataContextChanged += OnDataContextChanged;
         IsVisibleChanged += OnVisibleChanged;
-        Stage.SizeChanged += (_, _) => UpdateStageClip();
+        Stage.SizeChanged += (_, _) =>
+        {
+            UpdateStageClip();
+            StyleCaptions();
+        };
+        VideoImage.SizeChanged += (_, _) => StyleCaptions();
+        _captionClock.Tick += (_, _) => UpdateCaption();
     }
 
     private PlayerViewModel? Player => _vm?.Player;
@@ -100,6 +107,7 @@ public partial class PlayerView : UserControl, IMediaHost
             case nameof(PlayerViewModel.Current):
                 WatchCurrentItem();
                 UpdateSurface();
+                UpdateCaptionsButton();
                 break;
             case nameof(PlayerViewModel.IsPlaying):
                 UpdateSurface();
@@ -165,6 +173,7 @@ public partial class PlayerView : UserControl, IMediaHost
             _loadingVisible = false;
         }
         _surfaceShown = surface;
+        UpdateCaptionVisibility();
     }
 
     private static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
@@ -215,7 +224,9 @@ public partial class PlayerView : UserControl, IMediaHost
         try
         {
             Core.Initialize(ToolManager.VlcDir);
-            _libVlc = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--no-stats", "--quiet");
+            // Snag draws captions itself (see Captions.cs), so VLC's own subtitles stay off: no subtitle
+            // pictures, and no picking up .srt files next to videos on its own.
+            _libVlc = new LibVLC("--no-video-title-show", "--no-snapshot-preview", "--no-stats", "--quiet", "--no-spu", "--no-sub-autodetect-file");
             // Software decoding on purpose: VLC's GPU decoders crash (heap corruption) when frames are
             // copied back to memory for an app and files are switched quickly. Software decoding was
             // stable under the same stress test and handles 1080p AV1 with a few percent of the CPU.
@@ -252,6 +263,312 @@ public partial class PlayerView : UserControl, IMediaHost
             Log.Error("Couldn't start the VLC engine", ex);
             return false;
         }
+    }
+
+    // ---------------------------------------------------------------- captions (drawn by Snag, YouTube-style)
+
+    private static readonly (double Scale, string Name)[] CaptionSizes = [(0.75, "Small"), (1.0, "Normal"), (1.5, "Large"), (2.0, "Huge")];
+    private static readonly (string Id, string Name)[] CaptionBackgrounds = [("box", "Box (like YouTube)"), ("solid", "Solid"), ("none", "None (shadow only)")];
+    private static readonly FontFamily CaptionFont = new("Segoe UI");
+
+    private readonly DispatcherTimer _captionClock = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private CancellationTokenSource? _captionsCts;
+    private string? _captionsFor;              // the file the tracks below belong to
+    private List<CaptionTrack> _captionTracks = [];
+    private bool _captionTracksReady;          // false while still looking
+    private CaptionTrack? _captionTrack;       // the one showing; null = off
+    private List<CaptionCue>? _cues;
+    private string? _shownCaption;
+    private string? _preferredCaption;         // the track name last picked (e.g. "English"), chosen again next time
+    private ContextMenu? _captionsMenu;
+
+    private bool CaptionsShowing => _captionTrack is not null && Player?.Current is { IsAudio: false };
+
+    /// <summary>A new file: forget the old captions and look for this one's (inside it and next to it).</summary>
+    private void LoadCaptionsFor(PlaylistItem item)
+    {
+        if (string.Equals(_captionsFor, item.Path, StringComparison.OrdinalIgnoreCase)) return; // replaying the same file
+        _captionsCts?.Cancel();
+        _captionsFor = item.Path;
+        _captionTracks = [];
+        _captionTrack = null;
+        _cues = null;
+        _captionClock.Stop();
+        ShowCaption(null);
+        _captionTracksReady = item.IsAudio;
+        UpdateCaptionsButton();
+        if (item.IsAudio) return;
+        var cts = _captionsCts = new CancellationTokenSource();
+        _ = FindCaptionsAsync(item.Path, cts.Token);
+    }
+
+    private void ForgetCaptions()
+    {
+        _captionsCts?.Cancel();
+        _captionsFor = null;
+        _captionTracks = [];
+        _captionTrack = null;
+        _cues = null;
+        _captionClock.Stop();
+        ShowCaption(null);
+        UpdateCaptionsButton();
+    }
+
+    private async Task FindCaptionsAsync(string path, CancellationToken ct)
+    {
+        try
+        {
+            var tracks = await Captions.FindTracksAsync(path, ct);
+            if (ct.IsCancellationRequested) return;
+            _captionTracks = tracks;
+            _captionTracksReady = true;
+            if (_vm?.CaptionsOn == true && tracks.Count > 0) await ShowTrackAsync(PreferredTrack(tracks), ct);
+            UpdateCaptionsButton();
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer file took over.
+        }
+    }
+
+    private CaptionTrack PreferredTrack(List<CaptionTrack> tracks) =>
+        tracks.FirstOrDefault(t => string.Equals(t.Name, _preferredCaption, StringComparison.OrdinalIgnoreCase))
+        ?? tracks.FirstOrDefault(t => t.Name.StartsWith("English", StringComparison.OrdinalIgnoreCase))
+        ?? tracks[0];
+
+    /// <summary>Reads a track and starts showing it (null hides captions).</summary>
+    private async Task ShowTrackAsync(CaptionTrack? track, CancellationToken ct)
+    {
+        if (track is null)
+        {
+            _captionTrack = null;
+            _cues = null;
+            _captionClock.Stop();
+            ShowCaption(null);
+            UpdateCaptionsButton();
+            return;
+        }
+        var cues = await Captions.LoadAsync(track, ct);
+        if (ct.IsCancellationRequested || !string.Equals(_captionsFor, track.MediaPath, StringComparison.OrdinalIgnoreCase)) return;
+        if (cues is not { Count: > 0 })
+        {
+            _vm?.ShowToast($"Couldn't read the captions in \"{track.Name}\".");
+            return;
+        }
+        _captionTrack = track;
+        _cues = cues;
+        _captionClock.Start();
+        UpdateCaption();
+        UpdateCaptionsButton();
+    }
+
+    /// <summary>The user picked a track (or Off) from the menu or with the C key.</summary>
+    private async Task ChooseTrackAsync(CaptionTrack? track)
+    {
+        if (_vm is null) return;
+        _vm.CaptionsOn = track is not null;
+        if (track is not null) _preferredCaption = track.Name;
+        try
+        {
+            await ShowTrackAsync(track, _captionsCts?.Token ?? CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // Moved on to another file meanwhile.
+        }
+    }
+
+    /// <summary>The C key: captions off, or back on with the preferred track.</summary>
+    private void ToggleCaptions()
+    {
+        if (_vm is null || Player?.Current is not { IsAudio: false }) return;
+        if (CaptionsShowing)
+        {
+            _ = ChooseTrackAsync(null);
+            _vm.ShowToast("Captions off");
+        }
+        else if (_captionTracks.Count > 0)
+        {
+            var track = PreferredTrack(_captionTracks);
+            _ = ChooseTrackAsync(track);
+            _vm.ShowToast($"Captions: {track.Name}");
+        }
+        else
+        {
+            _vm.ShowToast(_captionTracksReady
+                ? "This video has no captions. The CC button can add a subtitle file."
+                : "Still looking for captions in this video…");
+        }
+    }
+
+    /// <summary>The + and - keys: one caption size up or down.</summary>
+    private void StepCaptionSize(int step)
+    {
+        if (_vm is null) return;
+        var index = Array.FindIndex(CaptionSizes, s => s.Scale >= _vm.CaptionScale - 0.01);
+        index = Math.Clamp((index < 0 ? 1 : index) + step, 0, CaptionSizes.Length - 1);
+        SetCaptionSize(CaptionSizes[index].Scale);
+        _vm.ShowToast($"Caption size: {CaptionSizes[index].Name}");
+    }
+
+    private void SetCaptionSize(double scale)
+    {
+        if (_vm is null) return;
+        _vm.CaptionScale = scale;
+        StyleCaptions();
+    }
+
+    private void SetCaptionBackground(string id)
+    {
+        if (_vm is null) return;
+        _vm.CaptionBackground = id;
+        StyleCaptions();
+    }
+
+    private void UpdateCaption()
+    {
+        if (_player is null || _cues is null)
+        {
+            ShowCaption(null);
+            return;
+        }
+        ShowCaption(Captions.TextAt(_cues, TimeSpan.FromMilliseconds(Math.Max(0, _player.Time))));
+    }
+
+    /// <summary>One box per line, like YouTube; nothing when there's no caption right now.</summary>
+    private void ShowCaption(string? text)
+    {
+        if (text == _shownCaption) return;
+        _shownCaption = text;
+        CaptionPanel.Children.Clear();
+        if (!string.IsNullOrEmpty(text))
+        {
+            foreach (var line in text.Split('\n'))
+            {
+                CaptionPanel.Children.Add(new Border
+                {
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Child = new TextBlock { Text = line, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap },
+                });
+            }
+            StyleCaptions();
+        }
+        UpdateCaptionVisibility();
+    }
+
+    private void UpdateCaptionVisibility() =>
+        CaptionPanel.Visibility = _surfaceShown == Surface.Video && CaptionPanel.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>
+    /// Sizes the captions to the picture (about 4.5% of its height at Normal, as on YouTube) and keeps them
+    /// inside it, a little above its bottom edge, or above the controls while they float over the video.
+    /// </summary>
+    private void StyleCaptions()
+    {
+        if (CaptionPanel.Children.Count == 0) return;
+        var videoHeight = VideoImage.ActualHeight > 0 ? VideoImage.ActualHeight : Stage.ActualHeight;
+        var videoWidth = VideoImage.ActualWidth > 0 ? VideoImage.ActualWidth : Stage.ActualWidth;
+        var size = Math.Clamp(videoHeight * 0.045, 13, 60) * (_vm?.CaptionScale ?? 1);
+        var background = _vm?.CaptionBackground ?? "box";
+        Brush box = background switch
+        {
+            "solid" => new SolidColorBrush(Color.FromRgb(8, 8, 8)),
+            "none" => Brushes.Transparent,
+            _ => new SolidColorBrush(Color.FromArgb(0xBF, 8, 8, 8)),
+        };
+        Effect? shadow = background == "none" ? new DropShadowEffect { ShadowDepth = 1.5, BlurRadius = 5, Opacity = 0.95 } : null;
+
+        var letterbox = Math.Max(0, (Stage.ActualHeight - videoHeight) / 2);
+        var overControls = _fullscreen && Controls.IsHitTestVisible ? Math.Max(0, Controls.ActualHeight - Controls.Padding.Top) : 0;
+        CaptionPanel.Margin = new Thickness(0, 0, 0, Math.Max(letterbox + videoHeight * 0.05, overControls + 12));
+        CaptionPanel.MaxWidth = Math.Max(200, videoWidth * 0.9);
+
+        foreach (var child in CaptionPanel.Children)
+        {
+            if (child is not Border { Child: TextBlock line } border) continue;
+            border.Background = box;
+            border.Padding = new Thickness(size * 0.28, size * 0.04, size * 0.28, size * 0.08);
+            line.FontFamily = CaptionFont;
+            line.FontSize = size;
+            line.Foreground = Brushes.White;
+            line.Effect = shadow;
+        }
+    }
+
+    /// <summary>The CC button: Off, each track, size, background, and adding a subtitle file.</summary>
+    private void OnCaptionsClick(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = CaptionsButton, Placement = PlacementMode.Top };
+        var showing = CaptionsShowing;
+        menu.Items.Add(MenuEntry("Off", !showing, () => _ = ChooseTrackAsync(null)));
+        if (!_captionTracksReady) menu.Items.Add(MenuEntry("Looking for captions…", false, null, enabled: false));
+        else if (_captionTracks.Count == 0) menu.Items.Add(MenuEntry("No captions in this video", false, null, enabled: false));
+        foreach (var track in _captionTracks)
+            menu.Items.Add(MenuEntry(track.Name, showing && _captionTrack?.Key == track.Key, () => _ = ChooseTrackAsync(track)));
+
+        menu.Items.Add(new Separator());
+        var sizes = MenuEntry("Size", false, null);
+        foreach (var (scale, name) in CaptionSizes)
+            sizes.Items.Add(MenuEntry(name, Math.Abs((_vm?.CaptionScale ?? 1) - scale) < 0.01, () => SetCaptionSize(scale)));
+        menu.Items.Add(sizes);
+        var backgrounds = MenuEntry("Background", false, null);
+        foreach (var (id, name) in CaptionBackgrounds)
+            backgrounds.Items.Add(MenuEntry(name, (_vm?.CaptionBackground ?? "box") == id, () => SetCaptionBackground(id)));
+        menu.Items.Add(backgrounds);
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MenuEntry("Add subtitle file…", false, AddSubtitleFile));
+
+        menu.Closed += (_, _) =>
+        {
+            _captionsMenu = null;
+            if (_fullscreen) ShowOverlay();
+        };
+        _captionsMenu = menu;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>A menu entry; its header is a TextBlock so a track name's underscores aren't read as shortcuts.</summary>
+    private static MenuItem MenuEntry(string text, bool isChecked, Action? click, bool enabled = true)
+    {
+        var item = new MenuItem { Header = new TextBlock { Text = text }, IsChecked = isChecked, IsEnabled = enabled };
+        if (click is not null)
+        {
+            item.Click += (_, e) =>
+            {
+                e.Handled = true;
+                click();
+            };
+        }
+        return item;
+    }
+
+    private void AddSubtitleFile()
+    {
+        if (_vm is null || Player?.Current is not { IsAudio: false } current) return;
+        var dialog = new OpenFileDialog
+        {
+            Title = "Add a subtitle file",
+            Filter = "Subtitles|*.srt;*.vtt;*.ass;*.ssa|All files|*.*",
+            InitialDirectory = Path.GetDirectoryName(current.Path) ?? "",
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        var track = _captionTracks.FirstOrDefault(t => string.Equals(t.FilePath, dialog.FileName, StringComparison.OrdinalIgnoreCase))
+                    ?? Captions.FromFile(current.Path, dialog.FileName);
+        if (!_captionTracks.Contains(track)) _captionTracks = [.. _captionTracks, track];
+        _captionTracksReady = true;
+        _ = ChooseTrackAsync(track);
+    }
+
+    private void UpdateCaptionsButton()
+    {
+        var isVideo = Player?.Current is { IsAudio: false };
+        var showing = CaptionsShowing;
+        CaptionsButton.IsEnabled = isVideo;
+        CaptionsDot.Visibility = showing ? Visibility.Visible : Visibility.Collapsed;
+        if (showing) CaptionsButton.SetResourceReference(ForegroundProperty, "BrandBrush");
+        else CaptionsButton.ClearValue(ForegroundProperty);
+        CaptionsButton.ToolTip = !isVideo ? "Captions (videos only)" : showing ? "Captions: on (C)" : "Captions: off (C)";
     }
 
     private void ApplyVolume()
@@ -296,6 +613,7 @@ public partial class PlayerView : UserControl, IMediaHost
     {
         _loaded = item;
         ResetClock();
+        LoadCaptionsFor(item);
         if (!EnsureEngine())
         {
             Player?.OnMediaFailed("The VLC engine isn't installed yet. Open Settings and choose Re-download all.");
@@ -344,6 +662,7 @@ public partial class PlayerView : UserControl, IMediaHost
         _player?.Stop();
         _loaded = null;
         _clock.Stop();
+        ForgetCaptions();
         VideoImage.Source = null;
         ResetClock();
         UpdateSurface();
@@ -400,6 +719,9 @@ public partial class PlayerView : UserControl, IMediaHost
             case Key.P: p.Previous(); return true;
             case Key.S: p.Shuffle = !p.Shuffle; return true;
             case Key.R: p.CycleRepeat(); return true;
+            case Key.C: ToggleCaptions(); return true;
+            case Key.OemPlus or Key.Add: StepCaptionSize(1); return true;
+            case Key.OemMinus or Key.Subtract: StepCaptionSize(-1); return true;
             case Key.F when p.HasCurrent: _vm.IsFullscreen = !_vm.IsFullscreen; return true;
             default: return false;
         }
@@ -463,16 +785,18 @@ public partial class PlayerView : UserControl, IMediaHost
         Cursor = null;
         _idle.Stop();
         _idle.Start();
+        StyleCaptions(); // captions move up out of the controls' way
     }
 
     private void HideOverlay()
     {
         _idle.Stop();
-        // Stay visible while paused or while the pointer is on the controls.
-        if (!_fullscreen || Player?.IsPlaying != true || Controls.IsMouseOver) return;
+        // Stay visible while paused, while the pointer is on the controls, or while the captions menu is open.
+        if (!_fullscreen || Player?.IsPlaying != true || Controls.IsMouseOver || _captionsMenu is { IsOpen: true }) return;
         Controls.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(350)));
         Controls.IsHitTestVisible = false;
         Cursor = Cursors.None;
+        StyleCaptions(); // and back down once they've gone
     }
 
     private void UpdateStageClip()

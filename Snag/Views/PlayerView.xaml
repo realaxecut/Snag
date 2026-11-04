@@ -39,6 +39,9 @@
                     <!-- Video frames from the VLC engine -->
                     <Image x:Name="VideoImage" Stretch="Uniform" Visibility="Collapsed" RenderOptions.BitmapScalingMode="Linear" />
 
+                    <!-- Captions, drawn by Snag YouTube-style: a dark box behind each line. Sized and placed inside the picture by code. -->
+                    <StackPanel x:Name="CaptionPanel" VerticalAlignment="Bottom" HorizontalAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed" />
+
                     <!-- Songs: artwork instead of a black box -->
                     <Grid x:Name="AudioArt" Visibility="Collapsed" ClipToBounds="True">
                         <Border Opacity="0.35" Margin="-60">
@@ -228,6 +231,14 @@
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" Foreground="{DynamicResource BrandBrush}" Margin="0,0,10,0"
                                    ToolTip="Shuts down when the playlist ends"
                                    Visibility="{Binding Player.ShutdownWhenDone, Converter={StaticResource Vis}}" />
+                        <!-- Captions: on/off, pick a track, or add a subtitle file. Coloured, with a dot, while captions show. -->
+                        <Button x:Name="CaptionsButton" Style="{StaticResource IconButton}" Margin="0,0,4,0" ToolTip="Captions: off (C)" Click="OnCaptionsClick">
+                            <Grid>
+                                <TextBlock Text="&#xE7F0;" FontSize="15" HorizontalAlignment="Center" />
+                                <Ellipse x:Name="CaptionsDot" Width="4" Height="4" Fill="{DynamicResource BrandBrush}" VerticalAlignment="Bottom" Margin="0,0,0,-9"
+                                         Visibility="Collapsed" />
+                            </Grid>
+                        </Button>
                         <Button Style="{StaticResource IconButton}" Content="{Binding Player.VolumeGlyph}" Command="{Binding Player.ToggleMuteCommand}" ToolTip="Mute (M)" />
                         <Slider Width="110" Style="{StaticResource MediaSlider}" Minimum="0" Maximum="1" Value="{Binding Player.Volume}"
                                 VerticalAlignment="Center" Margin="4,0,8,0" ToolTip="Volume (Up / Down)" />

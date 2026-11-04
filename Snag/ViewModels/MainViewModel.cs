@@ -671,6 +671,30 @@ public sealed class MainViewModel : ObservableObject
         set => UpdateSetting(() => _settings.SponsorBlock = value);
     }
 
+    /// <summary>Whether the player shows captions when a video has them (remembered between videos and sessions).</summary>
+    public bool CaptionsOn
+    {
+        get => _settings.CaptionsOn;
+        set
+        {
+            if (value != _settings.CaptionsOn) UpdateSetting(() => _settings.CaptionsOn = value);
+        }
+    }
+
+    /// <summary>Caption size: 1 is normal (YouTube-like), 0.75 small, up to 2 for huge.</summary>
+    public double CaptionScale
+    {
+        get => _settings.CaptionScale;
+        set => UpdateSetting(() => _settings.CaptionScale = Math.Clamp(value, 0.5, 3));
+    }
+
+    /// <summary>"box" (a dark box behind each line, like YouTube), "solid", or "none" (shadowed text only).</summary>
+    public string CaptionBackground
+    {
+        get => _settings.CaptionBackground;
+        set => UpdateSetting(() => _settings.CaptionBackground = value is "solid" or "none" ? value : "box");
+    }
+
     public bool AddDownloadsToPlayer
     {
         get => _settings.AddDownloadsToPlayer;
@@ -1125,7 +1149,8 @@ public sealed class MainViewModel : ObservableObject
         }
 
         if (added == 0) return;
-        IsOptionsPopupOpen = false;
+        // It's in the queue below now: clear the preview (and the link) so the next one can be pasted straight away.
+        ClearPreview();
         ShowToast(added == 1 ? "Added to downloads" : $"Added {added} videos to downloads");
         Pump();
     }

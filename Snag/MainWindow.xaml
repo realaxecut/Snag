@@ -129,10 +129,20 @@
             </Border>
         </Grid>
 
-        <!-- Toast -->
-        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,30" Padding="16,11"
+        <!-- Toast (on the Player page it sits higher, clear of the playback buttons) -->
+        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Padding="16,11"
                 CornerRadius="10" Background="{DynamicResource ToastBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
                 IsHitTestVisible="False" Visibility="{Binding ToastText, Converter={StaticResource Vis}}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Margin" Value="0,0,0,30" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Page}" Value="Player">
+                            <Setter Property="Margin" Value="0,0,0,150" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Border.Effect>
                 <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.45" />
             </Border.Effect>

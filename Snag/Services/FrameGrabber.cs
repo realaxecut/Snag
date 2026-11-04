@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -15,8 +14,7 @@ public static class FrameGrabber
 {
     private static readonly SemaphoreSlim Gate = new(2); // adding a whole folder shouldn't swamp the CPU
     private static readonly ConcurrentDictionary<string, Task<string?>> Running = new(StringComparer.OrdinalIgnoreCase);
-
-    private static string FfmpegDir => Path.Combine(AppPaths.ToolsDir, "ffmpeg");
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
     /// <summary>The picture's path, or null when there's nothing to show (no FFmpeg yet, no cover art, unreadable file).</summary>
     public static Task<string?> GetAsync(string mediaPath, bool isAudio)
@@ -25,7 +23,7 @@ public static class FrameGrabber
         try
         {
             var file = new FileInfo(mediaPath);
-            if (!file.Exists || !File.Exists(Path.Combine(FfmpegDir, "ffmpeg.exe"))) return Task.FromResult<string?>(null);
+            if (!file.Exists || !File.Exists(FfTools.Ffmpeg)) return Task.FromResult<string?>(null);
             // Keyed on the file's identity, so an edited or replaced file gets a fresh picture.
             var key = $"{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..24].ToLowerInvariant();
@@ -70,7 +68,7 @@ public static class FrameGrabber
             args.AddRange(["-i", mediaPath, "-map", "0:v:0", "-frames:v", "1",
                 "-vf", "scale=w=480:h=480:force_original_aspect_ratio=decrease", "-q:v", "4", "-y", temp]);
 
-            var (code, _) = await RunAsync(Path.Combine(FfmpegDir, "ffmpeg.exe"), args).ConfigureAwait(false);
+            var (code, _) = await FfTools.RunAsync(FfTools.Ffmpeg, args, Timeout).ConfigureAwait(false);
             if (code != 0 || !File.Exists(temp) || new FileInfo(temp).Length == 0) return null;
             File.Move(temp, target, overwrite: true);
             return target;
@@ -96,48 +94,8 @@ public static class FrameGrabber
 
     private static async Task<double?> DurationAsync(string mediaPath)
     {
-        var ffprobe = Path.Combine(FfmpegDir, "ffprobe.exe");
-        if (!File.Exists(ffprobe)) return null;
-        var (code, output) = await RunAsync(ffprobe,
-            ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", mediaPath]).ConfigureAwait(false);
+        var (code, output) = await FfTools.RunAsync(FfTools.Ffprobe,
+            ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", mediaPath], Timeout).ConfigureAwait(false);
         return code == 0 && double.TryParse(output.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) ? seconds : null;
-    }
-
-    /// <summary>Runs an FFmpeg tool (no shell, arguments as a list) for up to 20 seconds.</summary>
-    private static async Task<(int Code, string Output)> RunAsync(string exe, IEnumerable<string> args)
-    {
-        var psi = new ProcessStartInfo(exe)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var arg in args) psi.ArgumentList.Add(arg);
-
-        using var process = Process.Start(psi);
-        if (process is null) return (-1, "");
-        ChildProcessJob.Attach(process);
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        try
-        {
-            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-                // Already gone.
-            }
-            return (-1, "");
-        }
-        await stderr.ConfigureAwait(false);
-        return (process.ExitCode, await stdout.ConfigureAwait(false));
     }
 }
