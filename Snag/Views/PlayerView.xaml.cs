@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -498,26 +499,34 @@ public partial class PlayerView : UserControl, IMediaHost
     /// <summary>The CC button: Off, each track, size, background, and adding a subtitle file.</summary>
     private void OnCaptionsClick(object sender, RoutedEventArgs e)
     {
-        var menu = new ContextMenu { PlacementTarget = CaptionsButton, Placement = PlacementMode.Top };
+        // A menu inherits fonts from the button it opens from, and that button uses the icon font, which
+        // has no letters (every word came out as boxes). So it gets the page's own text font.
+        var menu = new ContextMenu
+        {
+            PlacementTarget = CaptionsButton,
+            Placement = PlacementMode.Top,
+            FontFamily = FontFamily,
+            FontSize = FontSize,
+        };
         var showing = CaptionsShowing;
         menu.Items.Add(MenuEntry("Off", !showing, () => _ = ChooseTrackAsync(null)));
-        if (!_captionTracksReady) menu.Items.Add(MenuEntry("Looking for captions…", false, null, enabled: false));
-        else if (_captionTracks.Count == 0) menu.Items.Add(MenuEntry("No captions in this video", false, null, enabled: false));
+        if (!_captionTracksReady) menu.Items.Add(MenuEntry("Looking for captions…", null, null, enabled: false));
+        else if (_captionTracks.Count == 0) menu.Items.Add(MenuEntry("No captions in this video", null, null, enabled: false));
         foreach (var track in _captionTracks)
             menu.Items.Add(MenuEntry(track.Name, showing && _captionTrack?.Key == track.Key, () => _ = ChooseTrackAsync(track)));
 
         menu.Items.Add(new Separator());
-        var sizes = MenuEntry("Size", false, null);
+        var sizes = MenuEntry("Size", null, null);
         foreach (var (scale, name) in CaptionSizes)
             sizes.Items.Add(MenuEntry(name, Math.Abs((_vm?.CaptionScale ?? 1) - scale) < 0.01, () => SetCaptionSize(scale)));
         menu.Items.Add(sizes);
-        var backgrounds = MenuEntry("Background", false, null);
+        var backgrounds = MenuEntry("Background", null, null);
         foreach (var (id, name) in CaptionBackgrounds)
             backgrounds.Items.Add(MenuEntry(name, (_vm?.CaptionBackground ?? "box") == id, () => SetCaptionBackground(id)));
         menu.Items.Add(backgrounds);
 
         menu.Items.Add(new Separator());
-        menu.Items.Add(MenuEntry("Add subtitle file…", false, AddSubtitleFile));
+        menu.Items.Add(MenuEntry("Add subtitle file…", null, AddSubtitleFile));
 
         menu.Closed += (_, _) =>
         {
@@ -528,10 +537,29 @@ public partial class PlayerView : UserControl, IMediaHost
         menu.IsOpen = true;
     }
 
-    /// <summary>A menu entry; its header is a TextBlock so a track name's underscores aren't read as shortcuts.</summary>
-    private static MenuItem MenuEntry(string text, bool isChecked, Action? click, bool enabled = true)
+    /// <summary>
+    /// A menu entry. <paramref name="isChecked"/> true puts a tick before it (the current choice). The tick is
+    /// drawn here, in a column every entry has, so ticked entries, plain ones and submenus all line up.
+    /// The text is a TextBlock so a track name's underscores aren't read as keyboard shortcuts.
+    /// </summary>
+    private static MenuItem MenuEntry(string text, bool? isChecked, Action? click, bool enabled = true)
     {
-        var item = new MenuItem { Header = new TextBlock { Text = text }, IsChecked = isChecked, IsEnabled = enabled };
+        var tick = new TextBlock
+        {
+            Text = isChecked == true ? "" : "",
+            FontFamily = (FontFamily)Application.Current.FindResource("IconFont"),
+            FontSize = 12,
+            Width = 24,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        tick.SetResourceReference(TextBlock.ForegroundProperty, "BrandBrush");
+        var header = new DockPanel();
+        DockPanel.SetDock(tick, Dock.Left);
+        header.Children.Add(tick);
+        header.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+
+        var item = new MenuItem { Header = header, IsEnabled = enabled };
+        AutomationProperties.SetName(item, isChecked == true ? $"{text} (selected)" : text);
         if (click is not null)
         {
             item.Click += (_, e) =>
