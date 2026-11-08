@@ -1,6 +1,6 @@
 # Snag
 
-A clean, dark Windows app for downloading videos from YouTube, TikTok and Instagram with [yt-dlp](https://github.com/yt-dlp/yt-dlp), with a built-in player and an ad-free YouTube tab.
+A clean, dark Windows app for downloading videos from YouTube, TikTok and Instagram with [yt-dlp](https://github.com/yt-dlp/yt-dlp), with a built-in player and a Browser tab for YouTube (ad-free), TikTok and Instagram.
 
 ## Install
 
@@ -31,25 +31,23 @@ Snag checks this repository for a new release each time it starts (**Settings �
 - Extras: cover art and metadata, English subtitles (MP4), and SponsorBlock to skip sponsor segments.
 - A download queue with live speed and time left, plus cancel, retry, play and show-in-folder. You can run 1–4 downloads at once. Once a download is queued, the page clears, ready for the next link.
 
-**YouTube tab**
-- YouTube itself, inside Snag, in Snag's light or dark mode. It runs on Microsoft Edge's WebView2 engine, which is built into Windows 11 (on a PC without it, the tab offers Microsoft's free installer).
-- **Ads blocked:** requests to ad servers never leave your PC, the ad data is stripped out of YouTube's player before any ad is scheduled, ad boxes are hidden from the feed and watch pages, and any ad that still slips through is muted and skipped. The shield button turns it off and on and counts what it stopped.
-- **SponsorBlock:** sponsor reads and self-promotion are skipped as they come up, using the community's [SponsorBlock](https://sponsor.ajay.app) data. It works in Snag's player too, for videos streamed from the YouTube tab.
-- **Dislikes are back:** the dislike count shows next to the dislike button again, from [Return YouTube Dislike](https://returnyoutubedislike.com).
-- **Sign in** with your Google account and you stay signed in, with your subscriptions, history and recommendations. Google sometimes refuses sign-in from browsers built into apps; if it says the browser "may not be secure", there's no way around that from Snag's side.
-- On any video:
-  - **Play in Snag** streams it in Snag's player, so nothing is downloaded.
-  - **Queue** adds it to the end of the player's queue, also streamed.
-  - **Download** saves it as MP4 or MP3, with the quality and extras chosen on the Download page.
-  - Right-click any thumbnail or title for the same choices.
-- **⋯ → Play clicked videos in Snag's player** makes a click on a video play it in Snag instead of on the page.
-- The search box searches YouTube, or opens a YouTube link you paste. The tab only ever shows YouTube and Google's sign-in pages; other links open in your normal browser.
-- Only one thing plays at a time: starting a video on the page pauses Snag's player, and the other way round.
-- **⋯ → Clear browsing data** signs you out and clears the tab's cookies, history and cache.
+**Browser tab**
+- **YouTube, TikTok and Instagram** inside Snag, in Snag's light or dark mode. The first time you open the tab after Snag starts, pick one of the three. The switcher at the top changes site any time. It runs on Microsoft Edge's WebView2 engine, which is built into Windows 11 (on a PC without it, the tab offers Microsoft's free installer).
+- **Sign in** to each site and you stay signed in. Sign-in pop-ups like "Continue with Google" or "Log in with Facebook" open in a small window of their own. Google sometimes refuses sign-in from browsers built into apps; if it says the browser "may not be secure", there's no way around that from Snag's side.
+- **Download** any video: a YouTube video, a TikTok video or photo post, or an Instagram post or reel. Use the **Download** button while it's open, or right-click its link. It's saved as MP4 or MP3, with the quality and extras chosen on the Download page.
+- On YouTube:
+  - **Ads blocked:** requests to ad servers never leave your PC, the ad data is stripped out of YouTube's player before any ad is scheduled, ad boxes are hidden from the feed and watch pages, and any ad that still slips through is muted and skipped. The shield button turns it off and on and counts what it stopped. Ad and tracker servers are blocked on TikTok and Instagram too.
+  - **SponsorBlock:** sponsor reads and self-promotion are skipped as they come up, using the community's [SponsorBlock](https://sponsor.ajay.app) data. It works in Snag's player too, for streamed videos.
+  - **Dislikes are back:** the dislike count shows next to the dislike button again, from [Return YouTube Dislike](https://returnyoutubedislike.com).
+  - **Play in Snag** streams a video in Snag's player, so nothing is downloaded, and **Queue** adds it to the end of the player's queue. Both are also on the right-click menu.
+  - **⋯ → Play clicked YouTube videos in Snag's player** makes a click on a video play it in Snag instead of on the page.
+  - Only one thing plays at a time: starting a video on the page pauses Snag's player, and the other way round.
+- The search box searches the site you're on, or opens a link you paste. The tab only ever shows these three sites and their sign-in pages; other links open in your normal browser.
+- **⋯ → Clear browsing data** signs you out of all three and clears the tab's cookies, history and cache.
 
 **Player**
 - Plays your downloads and any video or audio file on your PC: **+** adds files, the folder button adds a whole folder, or drag files onto the player.
-- Also plays YouTube videos streamed from the YouTube tab, so nothing is downloaded. They show *Streaming from YouTube* in the queue. Snag looks each one up with yt-dlp when its turn comes, which takes a few seconds, and looks up the next one while the current one plays.
+- Also plays YouTube videos streamed from the Browser tab, so nothing is downloaded. They show *Streaming from YouTube* in the queue. Snag looks each one up with yt-dlp when its turn comes, which takes a few seconds, and looks up the next one while the current one plays.
   - To keep one, right-click it and choose **Download video (MP4)** or **Download audio (MP3)**, or use the download button on its row. Once it's saved, the file takes the stream's place in the queue.
   - Streams play at up to 1080p. Captions come with downloading.
 - Uses the VLC engine, so it plays every codec Snag can download (H.264, VP9, AV1, HEVC, MP3, AAC, Opus) plus almost anything else, with no Windows extensions needed. Snag installs its own copy of the engine; your installed VLC isn't touched.
@@ -99,12 +97,12 @@ Snag checks this repository for a new release each time it starts (**Settings �
 - **Sandboxed JavaScript.** YouTube now requires running its player code. That runs in Deno, which by default has no access to your files or network.
 - **No leftovers.** Every process Snag starts belongs to a Windows job object, so it's killed when Snag exits, even after a crash.
 - **Verified app updates.** Snag only downloads its own updates from this repository's releases, and runs the installer only if its SHA-256 matches the one published with it.
-- **A fenced-in YouTube tab.**
-  - The tab only shows YouTube and Google's sign-in pages. Any other link opens in your normal browser, and a page can't send itself anywhere else on its own.
-  - Pop-up windows, browser downloads, and requests for your camera, microphone, location or notifications are all refused.
+- **A fenced-in Browser tab.**
+  - The tab only shows YouTube, TikTok, Instagram and the sign-in pages they use (Google, Facebook, Apple). Any other link opens in your normal browser, and a page can't send itself anywhere else on its own.
+  - Pop-ups open only for sign-in, under the same rules. Browser downloads, and requests for your camera, microphone, location or notifications, are all refused.
   - Developer tools, saved passwords and form autofill are off.
   - The page talks to Snag only through a few fixed messages, and Snag re-checks every video link it's handed.
-- **Your YouTube sign-in stays in the tab.** It lives in the tab's own browser profile. Snag only checks whether YouTube's sign-in cookie exists, never its value, and yt-dlp never gets it.
+- **Your sign-ins stay in the tab.** They live in the tab's own browser profile. Snag only checks whether a site's sign-in cookie exists, never its value, and yt-dlp never gets it.
 - **Little leaves your PC.** For SponsorBlock, Snag sends only the first 4 characters of a hash of the video's ID and finds the video in the answer itself. Return YouTube Dislike is sent the video's ID, as its browser extension does. Both can be turned off in the tab's ⋯ menu.
 - **No telemetry.** Admin rights are needed only to install or update Snag itself. Snag and its tools always run as you.
 
@@ -119,7 +117,7 @@ Only download videos you own or have permission to save, and follow each site's 
 | Tools (yt-dlp, FFmpeg, Deno, VLC engine) | `%LOCALAPPDATA%\Snag\tools` (about 230 MB to download, 450 MB installed) |
 | Settings, player queue, saved playlists, history, log | `%LOCALAPPDATA%\Snag` |
 | Thumbnail copies for History (TikTok/Instagram links expire), player pictures for your own files | `%LOCALAPPDATA%\Snag\thumbs` |
-| The YouTube tab's sign-in, cookies, history and cache | `%LOCALAPPDATA%\Snag\browser` |
+| The Browser tab's sign-ins, cookies, history and cache | `%LOCALAPPDATA%\Snag\browser` |
 
 The tools live in your user folder, not Program Files, so yt-dlp can update itself without admin prompts. YouTube changes often, so that matters. yt-dlp updates at most once a day when Snag starts, and you can turn that off in **Settings**. The tools' **Check for updates** button also updates Deno and the VLC engine.
 
@@ -141,9 +139,9 @@ That pushes, then creates release `v<version>` with the installer and checksums 
 
 The project is .NET 10 WPF using the built-in Fluent theme. It has two NuGet packages:
 - **LibVLCSharp** drives the VLC engine. The engine itself is downloaded on first run rather than bundled.
-- **Microsoft.Web.WebView2** hosts the YouTube tab on the WebView2 engine that comes with Windows.
+- **Microsoft.Web.WebView2** hosts the Browser tab on the WebView2 engine that comes with Windows.
 
-The tab's page script (ad blocking, SponsorBlock, dislikes, handing videos to Snag) is `Snag\Assets\youtube-tab.js`. Video frames are drawn straight into a WPF image (`Views\VlcVideoSurface.cs`), so the player's overlays sit on top of the video. `Snag\Assets\make-icon.ps1` regenerates the icon.
+The Browser tab's page script (ad blocking, SponsorBlock, dislikes, handing videos to Snag) is `Snag\Assets\youtube-tab.js`. Video frames are drawn straight into a WPF image (`Views\VlcVideoSurface.cs`), so the player's overlays sit on top of the video. `Snag\Assets\make-icon.ps1` regenerates the icon.
 
 Switches for testing:
 - `Snag.exe --dry-run-shutdown` runs the shutdown countdown without turning the PC off.

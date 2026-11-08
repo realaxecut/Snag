@@ -100,7 +100,7 @@ public static partial class UrlGuard
     /// <summary>
     /// A single YouTube video (watch, Shorts, youtu.be, live or embed link) in one canonical form,
     /// https://www.youtube.com/watch?v=ID, or null. Used for videos streamed in the player and links
-    /// from the YouTube tab, so the same video is always the same string.
+    /// from the Browser tab, so the same video is always the same string.
     /// </summary>
     public static string? CanonicalVideoUrl(string? url) =>
         TryParse(url, out var uri, out _) && SiteOf(uri) == Site.YouTube && VideoIdOf(uri) is { } id ? WatchUrl(id) : null;
@@ -112,14 +112,58 @@ public static partial class UrlGuard
         (("." + uri.Host).EndsWith(".googlevideo.com", StringComparison.OrdinalIgnoreCase) ||
          ("." + uri.Host).EndsWith(".youtube.com", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Where the YouTube tab may go: YouTube itself and Google's sign-in pages. Everything else opens in the real browser.</summary>
+    /// <summary>
+    /// Where the Browser tab may go: YouTube, TikTok and Instagram, plus the sign-in pages they send you to
+    /// (Google, Facebook, Apple). Everything else opens in the real browser.
+    /// </summary>
     public static bool IsBrowserHost(string? host)
     {
         if (string.IsNullOrEmpty(host)) return false;
         var dotted = "." + host.ToLowerInvariant();
         return dotted.EndsWith(".youtube.com", StringComparison.Ordinal) ||
                dotted is ".youtu.be" or ".youtube-nocookie.com" or ".www.youtube-nocookie.com" ||
-               dotted.EndsWith(".google.com", StringComparison.Ordinal);
+               dotted.EndsWith(".tiktok.com", StringComparison.Ordinal) ||
+               dotted.EndsWith(".instagram.com", StringComparison.Ordinal) ||
+               dotted.EndsWith(".google.com", StringComparison.Ordinal) ||
+               dotted.EndsWith(".facebook.com", StringComparison.Ordinal) ||
+               dotted == ".appleid.apple.com";
+    }
+
+    /// <summary>Which of the three sites a page belongs to (sign-in pages belong to none).</summary>
+    public static Site? BrowserSiteOf(string? host)
+    {
+        if (string.IsNullOrEmpty(host)) return null;
+        var dotted = "." + host.ToLowerInvariant();
+        if (dotted.EndsWith(".youtube.com", StringComparison.Ordinal) || dotted == ".youtu.be") return Site.YouTube;
+        if (dotted.EndsWith(".tiktok.com", StringComparison.Ordinal)) return Site.TikTok;
+        if (dotted.EndsWith(".instagram.com", StringComparison.Ordinal)) return Site.Instagram;
+        return null;
+    }
+
+    [GeneratedRegex(@"^/@[^/]{1,64}/(video|photo)/\d{8,25}$")]
+    private static partial Regex TikTokPostPattern();
+
+    [GeneratedRegex(@"^/(?:[^/]{1,64}/)?(p|reel|reels|tv)/([A-Za-z0-9_-]{5,40})$")]
+    private static partial Regex InstagramPostPattern();
+
+    /// <summary>
+    /// A single TikTok video or photo post, or Instagram post or reel, as a clean link without tracking
+    /// parameters; null for anything else (feeds, profiles, YouTube).
+    /// </summary>
+    public static string? CleanPostUrl(string? url)
+    {
+        if (!TryParse(url, out var uri, out _)) return null;
+        var path = uri.AbsolutePath.TrimEnd('/');
+        switch (SiteOf(uri))
+        {
+            case Site.TikTok when TikTokPostPattern().IsMatch(path):
+                return "https://www.tiktok.com" + path;
+            case Site.Instagram when InstagramPostPattern().Match(path) is { Success: true } m:
+                var kind = m.Groups[1].Value == "reels" ? "reel" : m.Groups[1].Value;
+                return $"https://www.instagram.com/{kind}/{m.Groups[2].Value}/";
+            default:
+                return null;
+        }
     }
 
     public static string WatchUrl(string videoId) => $"https://www.youtube.com/watch?v={videoId}";

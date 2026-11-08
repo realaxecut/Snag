@@ -264,7 +264,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>A video on the YouTube tab went full screen (YouTube's own full-screen button, or F on the page).</summary>
+    /// <summary>A video on the Browser tab went full screen (YouTube's own full-screen button, or F on the page).</summary>
     public bool IsBrowserFullscreen
     {
         get;
@@ -278,7 +278,7 @@ public sealed class MainViewModel : ObservableObject
     public bool HideChrome => IsFullscreen || IsBrowserFullscreen;
 
     /// <summary>
-    /// One of Snag's own dialogs is showing. The YouTube tab's page is a separate native window that would
+    /// One of Snag's own dialogs is showing. The Browser tab's page is a separate native window that would
     /// otherwise sit on top of it, so it steps aside meanwhile.
     /// </summary>
     public bool IsDialogOpen { get; set => Set(ref field, value); }
@@ -775,42 +775,42 @@ public sealed class MainViewModel : ObservableObject
         }
     } = "";
 
-    // ================================================================ YouTube tab
+    // ================================================================ Browser tab
 
-    /// <summary>Block ads on the YouTube tab.</summary>
+    /// <summary>Block ads on the Browser tab.</summary>
     public bool BrowserAdBlock
     {
         get => _settings.BrowserAdBlock;
         set => UpdateSetting(() => _settings.BrowserAdBlock = value);
     }
 
-    /// <summary>Clicking a video on the YouTube tab plays it in Snag's player instead of on the page.</summary>
+    /// <summary>Clicking a video on the Browser tab plays it in Snag's player instead of on the page.</summary>
     public bool BrowserPlayInSnag
     {
         get => _settings.BrowserPlayInSnag;
         set => UpdateSetting(() => _settings.BrowserPlayInSnag = value);
     }
 
-    /// <summary>Skip sponsor reads (SponsorBlock) on the YouTube tab and in streamed videos in the player.</summary>
+    /// <summary>Skip sponsor reads (SponsorBlock) on the Browser tab and in streamed videos in the player.</summary>
     public bool BrowserSponsorBlock
     {
         get => _settings.BrowserSponsorBlock;
         set => UpdateSetting(() => _settings.BrowserSponsorBlock = value);
     }
 
-    /// <summary>Show dislike counts on the YouTube tab (Return YouTube Dislike).</summary>
+    /// <summary>Show dislike counts on the Browser tab (Return YouTube Dislike).</summary>
     public bool BrowserDislikes
     {
         get => _settings.BrowserDislikes;
         set => UpdateSetting(() => _settings.BrowserDislikes = value);
     }
 
-    /// <summary>Ads and ad trackers stopped on the YouTube tab since Snag started.</summary>
+    /// <summary>Ads and ad trackers stopped in the Browser tab since Snag started.</summary>
     public int AdsBlocked { get; private set => Set(ref field, value); }
 
     public void CountBlockedAd() => AdsBlocked++;
 
-    /// <summary>Asks the YouTube tab to show a page (from the player's "Open in YouTube tab").</summary>
+    /// <summary>Asks the Browser tab to show a page (from the player's "Open in Browser tab").</summary>
     public event Action<string>? BrowseRequested;
 
     public void OpenInBrowser(string url)
@@ -857,15 +857,17 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Downloads a YouTube video with the formats picked on the Download page (MP4 or MP3, resolution, codec,
+    /// Downloads a YouTube video, or a TikTok or Instagram post, with the formats picked on the Download page (MP4 or MP3, resolution, codec,
     /// extras). <paramref name="audioOnly"/> overrides MP4/MP3. <paramref name="fromQueue"/>: started from a
     /// streamed video in the player's queue, which the file replaces once it's saved.
     /// </summary>
     public async Task DownloadVideoAsync(string url, string? title, string? thumbnail, bool? audioOnly = null, bool fromQueue = false)
     {
-        if (UrlGuard.CanonicalVideoUrl(url) is not { } canonical || UrlGuard.VideoIdOf(new Uri(canonical)) is not { } id)
+        // A YouTube video, or a single TikTok or Instagram post.
+        var youTube = UrlGuard.CanonicalVideoUrl(url);
+        if ((youTube ?? UrlGuard.CleanPostUrl(url)) is not { } link)
         {
-            ShowToast("That isn't a YouTube video.");
+            ShowToast("That isn't a video Snag can download.");
             return;
         }
         if (!ToolsReady)
@@ -874,7 +876,7 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
         var mp3 = audioOnly ?? IsMp3;
-        if (Queue.Any(q => q.CanCancel && q.Job.Url == canonical && q.IsAudio == mp3))
+        if (Queue.Any(q => q.CanCancel && q.Job.Url == link && q.IsAudio == mp3))
         {
             ShowToast("That's already downloading");
             return;
@@ -882,8 +884,35 @@ public sealed class MainViewModel : ObservableObject
 
         string? channel = null;
         title = YouTubeMeta.CleanText(title);
-        if (title is null or PlaylistItem.UntitledStream && await YouTubeMeta.GetAsync(id) is { } meta) (title, channel) = meta;
-        if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = UrlGuard.ThumbnailFor(id, large: true);
+        if (youTube is not null && UrlGuard.VideoIdOf(new Uri(youTube)) is { } id)
+        {
+            if (title is null or PlaylistItem.UntitledStream && await YouTubeMeta.GetAsync(id) is { } meta) (title, channel) = meta;
+            if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = UrlGuard.ThumbnailFor(id, large: true);
+        }
+        else
+        {
+            // TikTok and Instagram: yt-dlp reads the post first, for its title and picture (and so a post that
+            // can't be downloaded, like a private one, says so now instead of failing in the queue).
+            ShowToast("Getting the video…");
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                var info = await _ytdlp.AnalyzeAsync(new Uri(link), asPlaylist: false, cts.Token);
+                if (info.IsLive) throw new YtDlpException("This is a live stream. You can download it once it has ended.");
+                title = YouTubeMeta.CleanText(info.Title) ?? title;
+                channel = info.Channel;
+                thumbnail = info.ThumbnailUrl;
+                if (UrlGuard.CleanPageUrl(info.PageUrl) is { } page) link = page;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Couldn't read a post from the Browser tab", ex);
+                ShowToast(ex is YtDlpException ? ex.Message : "Couldn't read that post. Try again in a moment.");
+                return;
+            }
+            if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = null;
+            title ??= UrlGuard.SiteOf(new Uri(link)) == Site.TikTok ? "TikTok video" : "Instagram post";
+        }
 
         var options = new DownloadOptions(
             AudioOnly: mp3,
@@ -893,7 +922,7 @@ public sealed class MainViewModel : ObservableObject
             EmbedThumbnail: EmbedThumbnail,
             EmbedSubtitles: EmbedSubtitles && !mp3,
             SponsorBlock: SponsorBlock);
-        AddToQueue(new DownloadItemViewModel(new DownloadJob(canonical, OutputFolder, "", options), title ?? PlaylistItem.UntitledStream, channel, thumbnail)
+        AddToQueue(new DownloadItemViewModel(new DownloadJob(link, OutputFolder, "", options), title ?? PlaylistItem.UntitledStream, channel, thumbnail)
         {
             SwapsQueueStream = fromQueue,
         });

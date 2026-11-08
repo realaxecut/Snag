@@ -1,4 +1,4 @@
-// Snag's script for the YouTube tab (Views\BrowserView.xaml.cs adds it). It runs in every YouTube page
+// Snag's script for the Browser tab (Views\BrowserView.xaml.cs adds it). It runs in every YouTube page
 // before the page's own scripts, and does four things:
 //   1. Ad blocking (when switched on): strips the ad data out of YouTube's player responses so no ads are
 //      scheduled, hides ad boxes in the feed and on watch pages, and skips any ad that still gets through.

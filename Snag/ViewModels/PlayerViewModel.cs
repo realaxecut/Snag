@@ -61,7 +61,7 @@ public sealed class PlaylistItem : ObservableObject
 
     public string Path { get; }
 
-    /// <summary>Streams start with what the YouTube tab knew and get the real title once it's looked up.</summary>
+    /// <summary>Streams start with what the Browser tab knew and get the real title once it's looked up.</summary>
     public string Title { get; set => Set(ref field, value); }
 
     /// <summary>Played straight from YouTube, not from a file.</summary>
@@ -69,8 +69,8 @@ public sealed class PlaylistItem : ObservableObject
 
     public string ErrorHeading => IsStream ? "Couldn't play this video" : "Couldn't play this file";
 
-    /// <summary>The "where is it" action: a file is shown in Explorer, a stream opens in the YouTube tab.</summary>
-    public string LocateText => IsStream ? "Open in YouTube tab" : "Show in folder";
+    /// <summary>The "where is it" action: a file is shown in Explorer, a stream opens in the Browser tab.</summary>
+    public string LocateText => IsStream ? "Open in Browser tab" : "Show in folder";
 
     /// <summary>The download's thumbnail, or (for files from the PC) a frame from the video or the song's cover art.</summary>
     public string? ArtworkUrl { get; set => Set(ref field, value); }

@@ -27,16 +27,16 @@ public sealed class AppSettings
     public bool OptionsPopup { get; set; }
     public DateTime? LastAppUpdateCheckUtc { get; set; }
     public bool NumberPlaylistItems { get; set; } = true;
-    /// <summary>YouTube tab: block ads (network filter, ad data stripped from the player, ad boxes hidden).</summary>
+    /// <summary>Browser tab: block ads (network filter, ad data stripped from the player, ad boxes hidden).</summary>
     public bool BrowserAdBlock { get; set; } = true;
 
-    /// <summary>YouTube tab: clicking a video plays it in Snag's player instead of on the page.</summary>
+    /// <summary>Browser tab: clicking a video plays it in Snag's player instead of on the page.</summary>
     public bool BrowserPlayInSnag { get; set; }
 
-    /// <summary>Skip sponsor reads (SponsorBlock) on the YouTube tab and in streamed videos in the player.</summary>
+    /// <summary>Skip sponsor reads (SponsorBlock) on the Browser tab and in streamed videos in the player.</summary>
     public bool BrowserSponsorBlock { get; set; } = true;
 
-    /// <summary>YouTube tab: show the dislike count (Return YouTube Dislike).</summary>
+    /// <summary>YouTube in the Browser tab: show the dislike count (Return YouTube Dislike).</summary>
     public bool BrowserDislikes { get; set; } = true;
 
     public double Volume { get; set; } = 0.8;

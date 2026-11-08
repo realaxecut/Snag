@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Snag</AssemblyName>
     <RootNamespace>Snag</RootNamespace>
-    <Version>1.4.1</Version>
+    <Version>1.5.0</Version>
     <Product>Snag</Product>
     <Description>A clean, safe yt-dlp front end with a built-in player.</Description>
     <ApplicationIcon>Assets\snag.ico</ApplicationIcon>
@@ -21,13 +21,13 @@
   <ItemGroup>
     <Resource Include="Assets\snag.ico" />
     <None Remove="Assets\make-icon.ps1" />
-    <!-- The YouTube tab's page script (ad blocking, handing videos to Snag); see Views\BrowserView.xaml.cs. -->
+    <!-- The Browser tab's page script (ad blocking, handing videos to Snag); see Views\BrowserView.xaml.cs. -->
     <EmbeddedResource Include="Assets\youtube-tab.js" LogicalName="Snag.Assets.youtube-tab.js" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LibVLCSharp" Version="3.10.2" />
-    <!-- The YouTube tab. Uses the WebView2 engine built into Windows (Edge), so nothing big is bundled. -->
+    <!-- The Browser tab. Uses the WebView2 engine built into Windows (Edge), so nothing big is bundled. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
   </ItemGroup>
 

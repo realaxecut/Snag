@@ -215,7 +215,7 @@ public partial class PlayerView : UserControl, IMediaHost
         if (Player?.Current is { } item) Locate(item);
     }
 
-    /// <summary>A file is shown in Explorer; a streamed video opens on the YouTube tab.</summary>
+    /// <summary>A file is shown in Explorer; a streamed video opens on the Browser tab.</summary>
     private void Locate(PlaylistItem item)
     {
         if (item.IsStream) _vm?.OpenInBrowser(item.Path);

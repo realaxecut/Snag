@@ -48,8 +48,8 @@
                     <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
                                  IsChecked="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Browse}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE714;" />
-                            <TextBlock Text="YouTube" Margin="8,0,0,0" />
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE774;" />
+                            <TextBlock Text="Browser" Margin="8,0,0,0" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
@@ -149,7 +149,7 @@
                         <DataTrigger Binding="{Binding Page}" Value="Player">
                             <Setter Property="Margin" Value="0,0,0,150" />
                         </DataTrigger>
-                        <!-- The YouTube tab shows its own (the page would cover this one) -->
+                        <!-- The Browser tab shows its own (the page would cover this one) -->
                         <DataTrigger Binding="{Binding Page}" Value="Browse">
                             <Setter Property="Visibility" Value="Collapsed" />
                         </DataTrigger>

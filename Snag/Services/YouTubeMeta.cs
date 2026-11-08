@@ -4,7 +4,7 @@ namespace Snag.Services;
 
 /// <summary>
 /// A video's title and channel from YouTube's public oEmbed endpoint: one small request, much quicker than
-/// asking yt-dlp. Used for videos added from the YouTube tab whose title the page didn't give us.
+/// asking yt-dlp. Used for videos added from the Browser tab whose title the page didn't give us.
 /// </summary>
 public static class YouTubeMeta
 {
