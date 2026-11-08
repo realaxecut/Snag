@@ -240,6 +240,9 @@ public partial class BrowserView : UserControl
                 UpdateCover();
                 UpdateToast();
                 break;
+            case nameof(MainViewModel.IsOptionsPopupOpen):
+                UpdateCover();
+                break;
             case nameof(MainViewModel.AdsBlocked) or nameof(MainViewModel.BrowserAdBlock):
                 UpdateShield();
                 break;
@@ -822,16 +825,10 @@ public partial class BrowserView : UserControl
         if (_videoUrl is { } url) _vm?.QueueStream(url, CurrentTitle, null);
     }
 
-    private void OnDownloadMenu(object sender, RoutedEventArgs e)
+    /// <summary>The download options pop-up (as on the Download page) for the video or post showing.</summary>
+    private void OnDownload(object sender, RoutedEventArgs e)
     {
-        if (CurrentItemUrl is not { } url || _vm is null) return;
-        var title = _videoUrl is null ? null : CurrentTitle;
-        var menu = NewMenu(DownloadButton, PlacementMode.Bottom);
-        menu.Items.Add(MenuEntry("Video (MP4)", null, () => _ = _vm.DownloadVideoAsync(url, title, null, audioOnly: false)));
-        menu.Items.Add(MenuEntry("Audio only (MP3)", null, () => _ = _vm.DownloadVideoAsync(url, title, null, audioOnly: true)));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(MenuEntry("Uses the quality and extras chosen on the Download page", null, null, enabled: false));
-        menu.IsOpen = true;
+        if (CurrentItemUrl is { } url) _vm?.ShowDownloadOptions(url);
     }
 
     /// <summary>
@@ -872,8 +869,7 @@ public partial class BrowserView : UserControl
             entries.Add(("Play in Snag", () => PlayInSnag(url, title)));
             entries.Add(("Add to Snag's queue", () => _vm.QueueStream(url, title, null)));
         }
-        entries.Add(("Download video (MP4)", () => _ = _vm.DownloadVideoAsync(url, title, null, audioOnly: false)));
-        entries.Add(("Download audio (MP3)", () => _ = _vm.DownloadVideoAsync(url, title, null, audioOnly: true)));
+        entries.Add(("Download…", () => _vm.ShowDownloadOptions(url)));
         var index = 0;
         foreach (var (label, run) in entries)
         {
@@ -1129,12 +1125,12 @@ public partial class BrowserView : UserControl
     }
 
     /// <summary>
-    /// Snag's dialogs and the shutdown countdown are drawn by WPF, which the native page window would cover. While
+    /// Snag's dialogs, the download options pop-up and the shutdown countdown are drawn by WPF, which the native page window would cover. While
     /// one is up the page steps aside and a still picture of it takes its place (blurred with the rest of the app).
     /// </summary>
     private async void UpdateCover()
     {
-        var covered = _vm is not null && (_vm.IsDialogOpen || _vm.Shutdown.IsOpen);
+        var covered = _vm is not null && (_vm.IsDialogOpen || _vm.Shutdown.IsOpen || _vm.IsOptionsPopupOpen);
         if (covered == _covered) return;
         _covered = covered;
         if (_web is null || _core is null) return;

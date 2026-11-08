@@ -69,6 +69,18 @@
             <views:PlaylistPicker Grid.Row="1" />
         </Grid>
 
+        <!-- ============ Reading the link (opened from the Browser tab before the details are in) ============ -->
+        <StackPanel Width="260" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Visibility="{Binding Preview, Converter={StaticResource Is}, ConverterParameter=Loading}">
+            <Border Width="66" Height="66" CornerRadius="19" Background="{DynamicResource BrandSoftBrush}" HorizontalAlignment="Center">
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" FontSize="25" Foreground="{DynamicResource BrandBrush}" HorizontalAlignment="Center" />
+            </Border>
+            <TextBlock Text="Getting the video…" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,20,0,14" />
+            <ProgressBar Style="{StaticResource SlimProgress}" IsIndeterminate="True" />
+            <TextBlock Text="Its sizes and formats show up here in a few seconds." Style="{StaticResource Muted}" FontSize="12.5"
+                       TextAlignment="Center" Margin="0,12,0,0" />
+        </StackPanel>
+
         <!-- ============ Options ============ -->
         <Border Grid.Column="1" Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1,0,0,0"
                 CornerRadius="0,12,12,0" Padding="22,24,22,22">

@@ -149,7 +149,12 @@ public sealed class MainViewModel : ObservableObject
 
         OpenOptionsPopupCommand = new RelayCommand(() => IsOptionsPopupOpen = true,
             () => UseOptionsPopup && Preview is PreviewState.Video or PreviewState.Playlist);
-        CloseOptionsPopupCommand = new RelayCommand(() => IsOptionsPopupOpen = false);
+        CloseOptionsPopupCommand = new RelayCommand(() =>
+        {
+            // Closed while still reading the link: stop reading it (or the pop-up would come back when it's done).
+            if (Preview == PreviewState.Loading) _analyzeCts?.Cancel();
+            IsOptionsPopupOpen = false;
+        });
 
         PickCustomColorCommand = new RelayCommand(p =>
         {
@@ -545,9 +550,34 @@ public sealed class MainViewModel : ObservableObject
         get;
         private set
         {
-            if (value && Page != AppPage.Download) Page = AppPage.Download;
+            // The Browser tab opens it over itself; anywhere else it belongs to the Download page.
+            if (value && Page is not (AppPage.Download or AppPage.Browse)) Page = AppPage.Download;
             Set(ref field, value);
         }
+    }
+
+    private bool _popupRequested;
+
+    /// <summary>
+    /// From the Browser tab's Download button: the download options pop-up for the video or post showing, over the
+    /// tab, exactly as the Download page does it (whatever the pop-up setting). It opens straight away and fills in
+    /// once the link has been read.
+    /// </summary>
+    public void ShowDownloadOptions(string url)
+    {
+        if ((UrlGuard.CanonicalVideoUrl(url) ?? UrlGuard.CleanPostUrl(url)) is not { } link)
+        {
+            ShowToast("That isn't a video Snag can download.");
+            return;
+        }
+        if (!ToolsReady || ToolsBusy)
+        {
+            ShowToast(ToolsBusy ? "Snag is updating its tools. Try again in a moment." : "Snag's tools aren't set up yet. Open the Download page to finish setting up.");
+            return;
+        }
+        UrlText = link;
+        _popupRequested = true;
+        _ = AnalyzeAsync();
     }
 
     // ---------------------------------------------------------------- link + preview
@@ -857,17 +887,15 @@ public sealed class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Downloads a YouTube video, or a TikTok or Instagram post, with the formats picked on the Download page (MP4 or MP3, resolution, codec,
+    /// Downloads a streamed YouTube video straight away (right-click in the player's queue), with the formats picked on the Download page (MP4 or MP3, resolution, codec,
     /// extras). <paramref name="audioOnly"/> overrides MP4/MP3. <paramref name="fromQueue"/>: started from a
     /// streamed video in the player's queue, which the file replaces once it's saved.
     /// </summary>
     public async Task DownloadVideoAsync(string url, string? title, string? thumbnail, bool? audioOnly = null, bool fromQueue = false)
     {
-        // A YouTube video, or a single TikTok or Instagram post.
-        var youTube = UrlGuard.CanonicalVideoUrl(url);
-        if ((youTube ?? UrlGuard.CleanPostUrl(url)) is not { } link)
+        if (UrlGuard.CanonicalVideoUrl(url) is not { } link || UrlGuard.VideoIdOf(new Uri(link)) is not { } id)
         {
-            ShowToast("That isn't a video Snag can download.");
+            ShowToast("That isn't a YouTube video.");
             return;
         }
         if (!ToolsReady)
@@ -884,35 +912,8 @@ public sealed class MainViewModel : ObservableObject
 
         string? channel = null;
         title = YouTubeMeta.CleanText(title);
-        if (youTube is not null && UrlGuard.VideoIdOf(new Uri(youTube)) is { } id)
-        {
-            if (title is null or PlaylistItem.UntitledStream && await YouTubeMeta.GetAsync(id) is { } meta) (title, channel) = meta;
-            if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = UrlGuard.ThumbnailFor(id, large: true);
-        }
-        else
-        {
-            // TikTok and Instagram: yt-dlp reads the post first, for its title and picture (and so a post that
-            // can't be downloaded, like a private one, says so now instead of failing in the queue).
-            ShowToast("Getting the video…");
-            try
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-                var info = await _ytdlp.AnalyzeAsync(new Uri(link), asPlaylist: false, cts.Token);
-                if (info.IsLive) throw new YtDlpException("This is a live stream. You can download it once it has ended.");
-                title = YouTubeMeta.CleanText(info.Title) ?? title;
-                channel = info.Channel;
-                thumbnail = info.ThumbnailUrl;
-                if (UrlGuard.CleanPageUrl(info.PageUrl) is { } page) link = page;
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Couldn't read a post from the Browser tab", ex);
-                ShowToast(ex is YtDlpException ? ex.Message : "Couldn't read that post. Try again in a moment.");
-                return;
-            }
-            if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = null;
-            title ??= UrlGuard.SiteOf(new Uri(link)) == Site.TikTok ? "TikTok video" : "Instagram post";
-        }
+        if (title is null or PlaylistItem.UntitledStream && await YouTubeMeta.GetAsync(id) is { } meta) (title, channel) = meta;
+        if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = UrlGuard.ThumbnailFor(id, large: true);
 
         var options = new DownloadOptions(
             AudioOnly: mp3,
@@ -1079,9 +1080,12 @@ public sealed class MainViewModel : ObservableObject
 
         _analyzeCts?.Cancel();
         var cts = _analyzeCts = new CancellationTokenSource();
+        // From the Browser tab: the pop-up opens now, showing that it's reading the link.
+        var popup = _popupRequested;
+        _popupRequested = false;
         AnalyzeError = null;
-        IsOptionsPopupOpen = false;
         Preview = PreviewState.Loading;
+        IsOptionsPopupOpen = popup;
         try
         {
             var info = await _ytdlp.AnalyzeAsync(uri, UrlGuard.WantsPlaylist(uri), cts.Token);
@@ -1089,7 +1093,7 @@ public sealed class MainViewModel : ObservableObject
             if (info.IsLive) throw new YtDlpException("This is a live stream. You can download it once the stream has ended.");
             if (info.IsUpcoming) throw new YtDlpException("This video hasn't premiered yet.");
             if (!info.IsPlaylist && info.PageUrl is null) throw new YtDlpException("Couldn't find a downloadable link for this post.");
-            ShowInfo(info, UrlGuard.VideoIdOf(uri));
+            ShowInfo(info, UrlGuard.VideoIdOf(uri), popup);
         }
         catch (OperationCanceledException)
         {
@@ -1101,6 +1105,8 @@ public sealed class MainViewModel : ObservableObject
             Log.Error("Analyze failed", ex);
             ResetPreview();
             AnalyzeError = ex is YtDlpException ? ex.Message : "Something went wrong: " + ex.Message;
+            // The Download page shows the error under the link box; the Browser tab can't, so it's a toast there.
+            if (popup) ShowToast(AnalyzeError);
         }
         finally
         {
@@ -1109,7 +1115,7 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    private void ShowInfo(MediaInfo info, string? focusId)
+    private void ShowInfo(MediaInfo info, string? focusId, bool popup = false)
     {
         _info = info;
         PreviewTitle = info.Title;
@@ -1142,7 +1148,7 @@ public sealed class MainViewModel : ObservableObject
             Preview = PreviewState.Video;
         }
         OnPropertyChanged(nameof(HasFocusVideo));
-        if (UseOptionsPopup) IsOptionsPopupOpen = true;
+        if (UseOptionsPopup || popup) IsOptionsPopupOpen = true;
     }
 
     private void ResetPreview()

@@ -148,12 +148,11 @@
                         <TextBlock x:Name="QueueLabel" Text="Queue" Margin="8,0,0,0" />
                     </StackPanel>
                 </Button>
-                <Button x:Name="DownloadButton" Style="{StaticResource GhostButton}" Height="40" Click="OnDownloadMenu"
-                        ToolTip="Download this video as MP4 or MP3">
+                <Button x:Name="DownloadButton" Style="{StaticResource GhostButton}" Height="40" Click="OnDownload"
+                        ToolTip="Download this video: MP4 or MP3, quality and extras">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" />
                         <TextBlock x:Name="DownloadLabel" Text="Download" Margin="8,0,0,0" />
-                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE70D;" FontSize="9" Margin="8,1,0,0" Foreground="{DynamicResource MutedBrush}" />
                     </StackPanel>
                 </Button>
             </StackPanel>
