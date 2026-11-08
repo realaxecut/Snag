@@ -86,6 +86,7 @@ public partial class BrowserView : UserControl
     private bool _titleFresh;       // the page title belongs to the page now showing (it lags behind in-page navigation)
     private bool _signedIn;
     private bool _covered;
+    private bool _refocusAfterCover;
 
     public BrowserView()
     {
@@ -101,6 +102,7 @@ public partial class BrowserView : UserControl
         ToastPopup.CustomPopupPlacementCallback = (popup, target, _) =>
             [new CustomPopupPlacement(new Point((target.Width - popup.Width) / 2, target.Height - popup.Height - 10), PopupPrimaryAxis.None)];
         ThemeManager.Changed += ApplyTheme;
+        _refocusTimer.Tick += OnRefocusTimer;
         UpdateShield();
     }
 
@@ -131,26 +133,55 @@ public partial class BrowserView : UserControl
         _window.Activated += (_, _) =>
         {
             UpdateToast();
-            // Switched back to Snag by clicking the page: WPF hands focus to whatever it last had (the search box,
-            // a tab) and the click into the page would lose its typing focus. The page gets it instead.
-            if (IsVisible && IsPointerOverPage()) Dispatcher.BeginInvoke(FocusPage, DispatcherPriority.Input);
+            if (!IsVisible || _web is null) return;
+            // Switched back to Snag by clicking the page: the browser takes focus itself (and if it didn't, it gets
+            // it a moment later). Switched back with the keyboard or the taskbar while typing in the page: WPF would
+            // hand focus to its own last control (the search box, a tab), so the page gets it back.
+            if (IsPointerOverPage() || (_pageFocused && !IsPointerOverWindow())) _refocusTimer.Start();
         };
         _window.Deactivated += (_, _) => UpdateToast();
         _window.LocationChanged += (_, _) => RepositionToast();
-        // Clicking into the page moves Windows' keyboard focus there, but WPF isn't told and keeps the last thing
-        // focused as the one to give focus back to, so typing went nowhere after switching windows. WPF sees its
-        // own focus vanish (to "nothing") while the window stays active: that's the page; point WPF at it.
-        _window.AddHandler(Keyboard.LostKeyboardFocusEvent, new KeyboardFocusChangedEventHandler((_, e) =>
-        {
-            if (e.NewFocus is null && IsVisible && _web is not null && _window.IsActive)
-                Dispatcher.BeginInvoke(FocusPage, DispatcherPriority.Input);
-        }), handledEventsToo: true);
+        // A click on Snag's own controls means typing goes there now, not to the page.
+        _window.AddHandler(PreviewMouseDownEvent, new MouseButtonEventHandler((_, _) => _pageFocused = false), handledEventsToo: true);
     }
 
-    /// <summary>Keyboard focus into the page (WPF's and the browser's), unless it's already there.</summary>
+    /// <summary>
+    /// Typing belongs to the page: the person last clicked into it (it says so, see youtube-tab.js) or Snag put focus
+    /// there. WPF isn't told when the page is clicked, so this is how Snag knows where to give focus back.
+    /// </summary>
+    private bool _pageFocused;
+
+    /// <summary>
+    /// Keyboard focus into the page. Never while Windows' focus is already inside it: taking it away there (even to
+    /// give it straight back) blurs whatever box is being typed in, and the page and Snag end up fighting over it.
+    /// </summary>
     private void FocusPage()
     {
-        if (_web is { IsVisible: true } web && !web.IsKeyboardFocusWithin && _vm?.IsDialogOpen != true) web.Focus();
+        if (_web is not { IsVisible: true } web || _vm?.IsDialogOpen == true || FocusIsInPage()) return;
+        // WPF only passes focus on to the page as it arrives; if WPF thinks the page already has it, start over.
+        if (web.IsKeyboardFocusWithin) Keyboard.ClearFocus();
+        web.Focus();
+        _pageFocused = true;
+    }
+
+    /// <summary>Whether Windows' keyboard focus is in the page (the browser's own windows inside Snag's).</summary>
+    private bool FocusIsInPage()
+    {
+        if (_web is null || _web.Handle == IntPtr.Zero) return false;
+        var info = new GuiThreadInfo { Size = Marshal.SizeOf<GuiThreadInfo>() };
+        if (!GetGUIThreadInfo(0, ref info) || info.Focus == IntPtr.Zero) return false;
+        return info.Focus == _web.Handle || IsChild(_web.Handle, info.Focus);
+    }
+
+    /// <summary>A moment after Snag is switched back to, so the click (or WPF's own focus handling) has happened first.</summary>
+    private readonly DispatcherTimer _refocusTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+
+    private void OnRefocusTimer(object? sender, EventArgs e)
+    {
+        _refocusTimer.Stop();
+        // Not if one of Snag's own boxes was clicked into meanwhile.
+        if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase) return;
+        FocusPage();
     }
 
     private bool IsPointerOverPage()
@@ -158,6 +189,14 @@ public partial class BrowserView : UserControl
         if (_web is not { IsVisible: true } web || !GetCursorPos(out var cursor)) return false;
         var topLeft = web.PointToScreen(new Point(0, 0));
         var bottomRight = web.PointToScreen(new Point(web.ActualWidth, web.ActualHeight));
+        return cursor.X >= topLeft.X && cursor.X < bottomRight.X && cursor.Y >= topLeft.Y && cursor.Y < bottomRight.Y;
+    }
+
+    private bool IsPointerOverWindow()
+    {
+        if (_window is null || !GetCursorPos(out var cursor)) return false;
+        var topLeft = _window.PointToScreen(new Point(0, 0));
+        var bottomRight = _window.PointToScreen(new Point(_window.ActualWidth, _window.ActualHeight));
         return cursor.X >= topLeft.X && cursor.X < bottomRight.X && cursor.Y >= topLeft.Y && cursor.Y < bottomRight.Y;
     }
 
@@ -494,7 +533,7 @@ public partial class BrowserView : UserControl
         if (e.Key == Key.Escape)
         {
             AddressBox.Text = DisplayAddress(_core?.Source);
-            _web?.Focus();
+            FocusPage();
             e.Handled = true;
             return;
         }
@@ -519,7 +558,7 @@ public partial class BrowserView : UserControl
         {
             Navigate("https://www.youtube.com/results?search_query=" + Uri.EscapeDataString(text));
         }
-        _web?.Focus();
+        FocusPage();
     }
 
     private void OnAddressFocus(object sender, KeyboardFocusChangedEventArgs e) => AddressBox.SelectAll();
@@ -689,8 +728,9 @@ public partial class BrowserView : UserControl
             var type = Text("type");
             if (type == "pagefocus")
             {
-                // The page took keyboard focus (a click into it): WPF's focus goes with it.
-                FocusPage();
+                // The page took keyboard focus (a click into it). Just remembered: the page already has focus, and
+                // moving it now would only blur the box being clicked.
+                _pageFocused = true;
                 return;
             }
             if (!fromYouTube) return; // Google's sign-in pages only ever send the above
@@ -891,8 +931,11 @@ public partial class BrowserView : UserControl
             _web.Visibility = Visibility.Visible;
             Snapshot.Visibility = Visibility.Collapsed;
             Snapshot.Source = null;
+            // Typing was in the page before the dialog: it goes back there.
+            if (_refocusAfterCover) _ = Dispatcher.BeginInvoke(FocusPage, DispatcherPriority.Input);
             return;
         }
+        _refocusAfterCover = _pageFocused;
 
         try
         {
@@ -1013,4 +1056,31 @@ public partial class BrowserView : UserControl
 
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out NativePoint point);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GuiThreadInfo
+    {
+        public int Size;
+        public uint Flags;
+        public IntPtr Active;
+        public IntPtr Focus;
+        public IntPtr Capture;
+        public IntPtr MenuOwner;
+        public IntPtr MoveSize;
+        public IntPtr Caret;
+        public NativeRect CaretRect;
+    }
+
+    /// <summary>Thread 0 = the thread in front, which owns Windows' keyboard focus.</summary>
+    [DllImport("user32.dll")]
+    private static extern bool GetGUIThreadInfo(uint threadId, ref GuiThreadInfo info);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsChild(IntPtr parent, IntPtr window);
 }
