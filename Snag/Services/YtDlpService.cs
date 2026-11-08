@@ -21,6 +21,12 @@ public readonly record struct DownloadProgress(string Status, double? Downloaded
 
 public sealed record DownloadResult(int ExitCode, string? Error);
 
+/// <summary>
+/// Where to stream a YouTube video from, straight into the player: one URL with both, or a video URL plus a
+/// separate audio URL. Both only ever point at YouTube's own media servers. They expire after a few hours.
+/// </summary>
+public sealed record StreamSource(string VideoUrl, string? AudioUrl, string? UserAgent, string? Referer, string? Title, bool IsLive);
+
 public interface IDownloadSink
 {
     void OnFormat(string formatId, int? height, int? width, int? fps, string? vcodec);
@@ -62,6 +68,87 @@ public sealed partial class YtDlpService(ToolManager tools)
             throw new YtDlpException(FriendlyError(errors) ?? "Couldn't read that link.");
         }
         return MediaInfoParser.Parse(json);
+    }
+
+    /// <summary>
+    /// Looks up a YouTube video's media URLs for streaming, nothing saved to disk. Picks the best picture up to
+    /// <paramref name="maxHeight"/>, preferring H.264 + AAC because they're the cheapest to decode in software.
+    /// </summary>
+    public async Task<StreamSource> ResolveStreamAsync(string canonicalUrl, string maxHeight, CancellationToken ct)
+    {
+        if (UrlGuard.CanonicalVideoUrl(canonicalUrl) != canonicalUrl) throw new YtDlpException("That isn't a YouTube video link.");
+        var res = maxHeight != "best" && SettingsStore.IsValidQuality(maxHeight) ? "res:" + maxHeight : "res";
+        var args = new List<string>
+        {
+            "-j", "--no-playlist", "--no-warnings",
+            "-f", "bv*+ba/b", "-S", res + ",vcodec:h264,acodec:aac",
+            "--", canonicalUrl,
+        };
+        using var process = Start(args, tools.Root);
+        using var registration = ct.Register(() => Kill(process));
+
+        var stdout = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+        var stderr = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        await process.WaitForExitAsync(CancellationToken.None);
+        var json = await stdout;
+        var errors = await stderr;
+
+        ct.ThrowIfCancellationRequested();
+        if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(json))
+        {
+            Log.Error($"Stream lookup failed (exit {process.ExitCode}): {errors.Trim()}");
+            throw new YtDlpException(FriendlyError(errors) ?? "Couldn't load this video from YouTube.");
+        }
+        return ParseStream(json);
+    }
+
+    private static StreamSource ParseStream(string json)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        static string? Str(System.Text.Json.JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.String ? v.GetString() : null;
+        static string? Header(System.Text.Json.JsonElement e, string name) =>
+            e.TryGetProperty("http_headers", out var h) && h.ValueKind == System.Text.Json.JsonValueKind.Object ? Str(h, name) : null;
+
+        if (root.TryGetProperty("is_upcoming", out var upcoming) && upcoming.ValueKind == System.Text.Json.JsonValueKind.True)
+            throw new YtDlpException("This video hasn't premiered yet.");
+        var isLive = root.TryGetProperty("is_live", out var live) && live.ValueKind == System.Text.Json.JsonValueKind.True;
+        var title = Str(root, "title");
+
+        string? video = null, audio = null, agent = null, referer = null;
+        if (root.TryGetProperty("requested_formats", out var formats) && formats.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            // A separate video and audio stream, merged by the player.
+            foreach (var format in formats.EnumerateArray())
+            {
+                var url = Str(format, "url");
+                var hasVideo = Str(format, "vcodec") is { } v && v != "none";
+                if (hasVideo && video is null) video = url;
+                else if (!hasVideo && audio is null) audio = url;
+                agent ??= Header(format, "User-Agent");
+                referer ??= Header(format, "Referer");
+            }
+            // An audio-only result (no video stream at all) still plays.
+            if (video is null && audio is not null) (video, audio) = (audio, null);
+        }
+        else
+        {
+            video = Str(root, "url");
+            agent = Header(root, "User-Agent");
+            referer = Header(root, "Referer");
+        }
+
+        if (!UrlGuard.IsAllowedStreamUrl(video) || (audio is not null && !UrlGuard.IsAllowedStreamUrl(audio)))
+        {
+            Log.Error("Stream lookup returned a URL outside YouTube's media servers; refused.");
+            throw new YtDlpException("YouTube didn't return a playable stream for this video.");
+        }
+        return new StreamSource(video!, audio, Clean(agent), Clean(referer), title, isLive);
+
+        // Header values go to the player as options: one line, nothing odd.
+        static string? Clean(string? value) =>
+            value is { Length: > 0 and < 512 } && value.All(c => c >= ' ' && c != '\u007f') ? value : null;
     }
 
     public async Task<DownloadResult> DownloadAsync(DownloadJob job, string tempDir, IDownloadSink sink, CancellationToken ct)

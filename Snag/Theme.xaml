@@ -25,6 +25,7 @@
     <SolidColorBrush x:Key="SelectedBrush" Color="#248B6CFF" />
     <SolidColorBrush x:Key="HaloBrush" Color="#33A48BFF" />
     <SolidColorBrush x:Key="DangerBrush" Color="#FF8080" />
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="#33FF6B6B" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#5EE08F" />
     <SolidColorBrush x:Key="StrongTextBrush" Color="White" />
     <SolidColorBrush x:Key="MutedBrush" Color="#A9A9B8" />
@@ -174,6 +175,38 @@
                 <ControlTemplate TargetType="Button">
                     <Grid>
                         <Border Background="{DynamicResource BrandGradientHorizontal}" CornerRadius="10" />
+                        <Border x:Name="Shine" Background="White" CornerRadius="10" Opacity="0" />
+                        <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shine" Property="Opacity" Value="0.12" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Shine" Property="Opacity" Value="0.04" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.35" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- For the one button in a dialog that deletes or stops something -->
+    <Style x:Key="DangerButton" TargetType="Button">
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Border Background="#D93A43" CornerRadius="10" />
                         <Border x:Name="Shine" Background="White" CornerRadius="10" Opacity="0" />
                         <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>

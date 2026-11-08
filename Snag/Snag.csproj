@@ -21,10 +21,14 @@
   <ItemGroup>
     <Resource Include="Assets\snag.ico" />
     <None Remove="Assets\make-icon.ps1" />
+    <!-- The YouTube tab's page script (ad blocking, handing videos to Snag); see Views\BrowserView.xaml.cs. -->
+    <EmbeddedResource Include="Assets\youtube-tab.js" LogicalName="Snag.Assets.youtube-tab.js" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LibVLCSharp" Version="3.10.2" />
+    <!-- The YouTube tab. Uses the WebView2 engine built into Windows (Edge), so nothing big is bundled. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
   </ItemGroup>
 
 </Project>

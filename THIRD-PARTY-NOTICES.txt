@@ -11,6 +11,16 @@ LibVLCSharp 3.10.2 - LGPL-2.1-or-later
   Copyright (c) .NET Foundation and contributors
   Source: https://github.com/dotnet/runtime, https://github.com/dotnet/wpf
 
+Microsoft Edge WebView2 SDK 1.0.4191.47 - BSD-3-Clause
+  Copyright (c) Microsoft Corporation
+  Source: https://www.nuget.org/packages/Microsoft.Web.WebView2
+  The WebView2 engine itself is part of Windows (Microsoft Edge WebView2 Runtime) and isn't shipped with Snag.
+
+Used by the YouTube tab (online services, nothing shipped)
+---------------------------------------------------------
+SponsorBlock - segment data CC BY-NC-SA 4.0 - https://sponsor.ajay.app
+Return YouTube Dislike - https://returnyoutubedislike.com
+
 Downloaded by Snag on first run (from their publishers, checksum-verified)
 -----------------------------------------------------------------------
 yt-dlp - The Unlicense - https://github.com/yt-dlp/yt-dlp

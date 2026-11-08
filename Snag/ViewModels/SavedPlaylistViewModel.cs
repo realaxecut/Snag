@@ -15,7 +15,7 @@ public sealed class SavedPlaylistViewModel : ObservableObject
         CreatedUtc = dto.CreatedUtc;
         Name = dto.Name;
         foreach (var entry in dto.Items)
-            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !File.Exists(entry.Path) });
+            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !PlaylistItem.IsAvailable(entry.Path) });
         Renumber();
         foreach (var item in Items) _ = LoadArtworkAsync(item);
 
@@ -68,7 +68,7 @@ public sealed class SavedPlaylistViewModel : ObservableObject
         {
             if (Items.Count >= PlaylistStore.MaxItems) break;
             if (Contains(entry.Path)) continue;
-            var item = new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !File.Exists(entry.Path) };
+            var item = new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !PlaylistItem.IsAvailable(entry.Path) };
             Items.Add(item);
             _ = LoadArtworkAsync(item);
             added++;
@@ -76,7 +76,12 @@ public sealed class SavedPlaylistViewModel : ObservableObject
         return added;
     }
 
-    public bool Contains(string path) => Items.Any(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase));
+    public bool Contains(string path)
+    {
+        // YouTube video IDs are case-sensitive; Windows paths aren't.
+        var comparison = PlaylistItem.IsStreamPath(path) ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        return Items.Any(i => string.Equals(i.Path, path, comparison));
+    }
 
     public void Move(PlaylistItem item, int offset)
     {

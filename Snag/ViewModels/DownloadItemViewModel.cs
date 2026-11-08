@@ -30,6 +30,9 @@ public sealed class DownloadItemViewModel : ObservableObject, IDownloadSink
     public string? ThumbnailUrl { get; }
     public bool IsAudio => Job.Options.AudioOnly;
 
+    /// <summary>Started from a streamed video in the player's queue: when it's done, the file takes the stream's place.</summary>
+    public bool SwapsQueueStream { get; init; }
+
     public string Badge { get; private set => Set(ref field, value); }
 
     public DownloadState State

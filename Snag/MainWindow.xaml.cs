@@ -41,8 +41,101 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.IsFullscreen)) ApplyFullscreen(_vm.IsFullscreen);
+        if (e.PropertyName == nameof(MainViewModel.HideChrome)) ApplyFullscreen(_vm.HideChrome);
         else if (e.PropertyName == nameof(MainViewModel.IsOptionsPopupOpen)) ShowOptionsPopup(_vm.IsOptionsPopupOpen);
+    }
+
+    // ---------------------------------------------------------------- Snag's dialogs (see Dialogs.cs)
+
+    private DispatcherFrame? _dialogFrame;
+    private bool _dialogResult;
+
+    /// <summary>One dialog at a time; a second one asked for meanwhile falls back to Windows' message box.</summary>
+    public bool CanShowSnagDialog => _dialogFrame is null;
+
+    /// <summary>
+    /// Shows a dialog over the blurred app and waits for the answer, like MessageBox.Show does (the app keeps
+    /// running meanwhile: playback, downloads and the clock carry on). True if the main button was chosen.
+    /// </summary>
+    public bool ShowSnagDialog(DialogRequest request)
+    {
+        if (_dialogFrame is not null) return false;
+        var danger = request.Tone == DialogTone.Danger;
+
+        DialogTitle.Text = request.Title;
+        DialogMessage.Text = request.Message;
+        DialogIcon.Text = request.Glyph;
+        DialogIconTile.SetResourceReference(Border.BackgroundProperty, danger ? "DangerSoftBrush" : "BrandSoftBrush");
+        DialogIcon.SetResourceReference(TextBlock.ForegroundProperty, danger ? "DangerBrush" : "BrandBrush");
+        DialogConfirm.Content = request.ConfirmText;
+        DialogConfirm.Style = (Style)FindResource(danger ? "DangerButton" : "PrimaryButton");
+        DialogCancel.Content = request.CancelText;
+        DialogCancel.Visibility = request.CancelText is null ? Visibility.Collapsed : Visibility.Visible;
+
+        var previousFocus = Keyboard.FocusedElement as UIElement;
+        _dialogResult = false;
+        _vm.IsDialogOpen = true;
+        AnimateDialog(open: true);
+        // Something that deletes or stops things starts on the safe button.
+        var first = danger && request.CancelText is not null ? DialogCancel : DialogConfirm;
+        Dispatcher.BeginInvoke(() => first.Focus(), DispatcherPriority.Input);
+
+        var frame = _dialogFrame = new DispatcherFrame();
+        try
+        {
+            Dispatcher.PushFrame(frame);
+        }
+        finally
+        {
+            _dialogFrame = null;
+            _vm.IsDialogOpen = false;
+            AnimateDialog(open: false);
+            if (previousFocus is { IsVisible: true, Focusable: true }) previousFocus.Focus();
+        }
+        return _dialogResult;
+    }
+
+    private void CloseDialog(bool result)
+    {
+        if (_dialogFrame is not { } frame) return;
+        _dialogResult = result;
+        frame.Continue = false;
+    }
+
+    private void OnDialogConfirm(object sender, RoutedEventArgs e) => CloseDialog(true);
+    private void OnDialogCancel(object sender, RoutedEventArgs e) => CloseDialog(false);
+    private void OnDialogScrimClick(object sender, MouseButtonEventArgs e) => CloseDialog(false);
+
+    /// <summary>The same entrance as the download options pop-up: fade and scale in while the app blurs.</summary>
+    private void AnimateDialog(bool open)
+    {
+        var duration = TimeSpan.FromMilliseconds(open ? 220 : 150);
+        if (open)
+        {
+            DialogOverlay.Visibility = Visibility.Visible;
+            if (AppContent.Effect is not BlurEffect)
+                AppContent.Effect = new BlurEffect { Radius = 0, RenderingBias = RenderingBias.Performance };
+        }
+
+        var fade = open
+            ? new DoubleAnimation(0, 1, duration) { EasingFunction = PopupEase }
+            : new DoubleAnimation(0, duration) { EasingFunction = PopupEase };
+        if (!open)
+        {
+            fade.Completed += (_, _) =>
+            {
+                if (_dialogFrame is not null) return; // another one opened meanwhile
+                DialogOverlay.Visibility = Visibility.Collapsed;
+                if (!_vm.IsOptionsPopupOpen) AppContent.Effect = null;
+            };
+        }
+        DialogOverlay.BeginAnimation(OpacityProperty, fade);
+        // The options pop-up keeps its own blur if it's open underneath.
+        if (AppContent.Effect is BlurEffect blur && !_vm.IsOptionsPopupOpen)
+            blur.BeginAnimation(BlurEffect.RadiusProperty, new DoubleAnimation(open ? 22 : 0, duration) { EasingFunction = PopupEase });
+        var scale = new DoubleAnimation(open ? 0.94 : 1, open ? 1 : 0.96, duration) { EasingFunction = PopupEase };
+        DialogCardScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+        DialogCardScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
     }
 
     // ---------------------------------------------------------------- download options pop-up
@@ -108,8 +201,12 @@ public partial class MainWindow : Window
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
+    private bool _fullscreenApplied;
+
     private void ApplyFullscreen(bool on)
     {
+        if (on == _fullscreenApplied) return;
+        _fullscreenApplied = on;
         if (on)
         {
             _restoreState = WindowState;
@@ -191,6 +288,21 @@ public partial class MainWindow : Window
     /// <summary>App-wide keyboard shortcuts; also called by the player's video overlay, which is its own window.</summary>
     public void HandleKey(KeyEventArgs e)
     {
+        if (_dialogFrame is not null)
+        {
+            // Esc answers "no"; Tab, Enter and Space work the dialog's buttons; nothing reaches the app behind.
+            if (e.Key == Key.Escape)
+            {
+                CloseDialog(false);
+                e.Handled = true;
+            }
+            else if (e.Key is not (Key.Tab or Key.Enter or Key.Space or Key.Left or Key.Right))
+            {
+                e.Handled = true;
+            }
+            return;
+        }
+
         if (_vm.Shutdown.IsOpen)
         {
             if (e.Key == Key.Escape)
@@ -215,6 +327,13 @@ public partial class MainWindow : Window
         if (e.Key == Key.Escape && _vm.IsFullscreen)
         {
             _vm.IsFullscreen = false;
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && _vm.IsBrowserFullscreen)
+        {
+            BrowserPane.ExitFullscreen();
             e.Handled = true;
             return;
         }
@@ -251,12 +370,24 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
-        if (!_vm.ConfirmExit())
+        if (_dialogFrame is not null)
         {
+            // A dialog is waiting for an answer; that comes first.
             e.Cancel = true;
+            return;
+        }
+        if (_vm.PendingDownloadsOnExit > 0)
+        {
+            // Ask outside the Closing event (a dialog's message loop doesn't belong in here), then close for real.
+            e.Cancel = true;
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (_vm.ConfirmExit()) Close();
+            });
             return;
         }
         _vm.OnExit();
         PlayerPane.Shutdown();
+        BrowserPane.Shutdown();
     }
 }

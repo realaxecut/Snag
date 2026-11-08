@@ -18,7 +18,7 @@
         </Grid.RowDefinitions>
 
         <!-- Top bar -->
-        <Grid Margin="22,12,22,12" Visibility="{Binding IsFullscreen, Converter={StaticResource Vis}, ConverterParameter=!}">
+        <Grid Margin="22,12,22,12" Visibility="{Binding HideChrome, Converter={StaticResource Vis}, ConverterParameter=!}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -43,6 +43,13 @@
                             <Border Style="{StaticResource CountBadge}" Visibility="{Binding ActiveCount, Converter={StaticResource Vis}}">
                                 <TextBlock Text="{Binding ActiveCount}" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
+                                 IsChecked="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Browse}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE714;" />
+                            <TextBlock Text="YouTube" Margin="8,0,0,0" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource NavPill}" GroupName="Nav"
@@ -106,6 +113,7 @@
         <!-- Pages -->
         <Grid Grid.Row="1">
             <views:DownloadView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Download}" />
+            <views:BrowserView x:Name="BrowserPane" Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Browse}" />
             <views:PlayerView x:Name="PlayerPane" Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Player}" />
             <views:PlaylistsView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=Playlists}" />
             <views:HistoryView Visibility="{Binding Page, Converter={StaticResource Is}, ConverterParameter=History}" />
@@ -132,13 +140,18 @@
         <!-- Toast (on the Player page it sits higher, clear of the playback buttons) -->
         <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Padding="16,11"
                 CornerRadius="10" Background="{DynamicResource ToastBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1"
-                IsHitTestVisible="False" Visibility="{Binding ToastText, Converter={StaticResource Vis}}">
+                IsHitTestVisible="False">
             <Border.Style>
                 <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="{Binding ToastText, Converter={StaticResource Vis}}" />
                     <Setter Property="Margin" Value="0,0,0,30" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding Page}" Value="Player">
                             <Setter Property="Margin" Value="0,0,0,150" />
+                        </DataTrigger>
+                        <!-- The YouTube tab shows its own (the page would cover this one) -->
+                        <DataTrigger Binding="{Binding Page}" Value="Browse">
+                            <Setter Property="Visibility" Value="Collapsed" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -184,6 +197,42 @@
                                 Content="Shut down now" Command="{Binding Shutdown.ShutDownNowCommand}" />
                     </Grid>
                     <TextBlock Text="Press Esc to cancel" Foreground="{DynamicResource FaintBrush}" FontSize="11.5" HorizontalAlignment="Center" Margin="0,14,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Snag's own dialogs (Dialogs.cs): shown, animated and answered by MainWindow.xaml.cs. -->
+        <Grid x:Name="DialogOverlay" Visibility="Collapsed">
+            <Border Background="{DynamicResource ScrimBrush}" Opacity="0.45" MouseLeftButtonDown="OnDialogScrimClick" />
+            <Border x:Name="DialogCard" Style="{StaticResource Card}" Background="{DynamicResource SurfaceBrush}" Width="460" Padding="26,24,26,22"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5"
+                    KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.DirectionalNavigation="Cycle">
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="DialogCardScale" />
+                </Border.RenderTransform>
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="50" ShadowDepth="10" Opacity="0.45" />
+                </Border.Effect>
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="DialogIconTile" Width="46" Height="46" CornerRadius="13" VerticalAlignment="Top">
+                            <TextBlock x:Name="DialogIcon" Style="{StaticResource Glyph}" FontSize="20" HorizontalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="16,2,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="DialogTitle" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DialogMessage" Style="{StaticResource Muted}" FontSize="13.5" LineHeight="20" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,26,0,0">
+                        <Button x:Name="DialogCancel" Style="{StaticResource GhostButton}" Height="40" MinWidth="104" Padding="18,0" FontSize="14"
+                                Click="OnDialogCancel" />
+                        <Button x:Name="DialogConfirm" Style="{StaticResource PrimaryButton}" MinWidth="112" Margin="10,0,0,0"
+                                Click="OnDialogConfirm" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
         </Grid>

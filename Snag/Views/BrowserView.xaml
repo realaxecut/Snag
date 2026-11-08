@@ -1,0 +1,146 @@
+<UserControl x:Class="Snag.Views.BrowserView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="Layout" Margin="22,2,22,22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ Toolbar ============ -->
+        <Grid x:Name="Toolbar" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" MinWidth="180" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="BackButton" Style="{StaticResource IconButton}" Width="38" Height="38" Content="&#xE72B;"
+                        ToolTip="Back (Alt+Left)" Click="OnBack" IsEnabled="False" />
+                <Button x:Name="ForwardButton" Style="{StaticResource IconButton}" Width="38" Height="38" Content="&#xE72A;"
+                        ToolTip="Forward (Alt+Right)" Click="OnForward" IsEnabled="False" />
+                <Button x:Name="ReloadButton" Style="{StaticResource IconButton}" Width="38" Height="38" Content="&#xE72C;"
+                        ToolTip="Reload (F5)" Click="OnReload" />
+                <Button Style="{StaticResource IconButton}" Width="38" Height="38" Content="&#xE80F;"
+                        ToolTip="YouTube home" Click="OnHome" />
+            </StackPanel>
+
+            <!-- Search YouTube, or go to a YouTube link -->
+            <Grid Grid.Column="1" Margin="10,0,0,0">
+                <TextBox x:Name="AddressBox" FontSize="13.5" Height="40" VerticalContentAlignment="Center" Padding="38,0,12,0"
+                         KeyDown="OnAddressKeyDown" GotKeyboardFocus="OnAddressFocus" LostKeyboardFocus="OnAddressBlur"
+                         TextChanged="OnAddressTextChanged" />
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE721;" Foreground="{DynamicResource MutedBrush}" Margin="14,0,0,0"
+                           HorizontalAlignment="Left" IsHitTestVisible="False" />
+                <TextBlock x:Name="AddressHint" Text="Search YouTube or paste a YouTube link" Foreground="{DynamicResource FaintBrush}"
+                           FontSize="13.5" Margin="40,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" TextTrimming="CharacterEllipsis" />
+                <ProgressBar x:Name="LoadingBar" Style="{StaticResource SlimProgress}" IsIndeterminate="True" Height="2"
+                             VerticalAlignment="Bottom" Margin="12,0,12,1" Visibility="Collapsed" IsHitTestVisible="False" />
+            </Grid>
+
+            <!-- The video on the page right now -->
+            <StackPanel x:Name="VideoActions" Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0" Visibility="Collapsed">
+                <Button Style="{StaticResource PrimaryButton}" Padding="16,0" Click="OnPlayInSnag"
+                        ToolTip="Play this video in Snag's player, streamed: nothing is downloaded">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE768;" />
+                        <TextBlock Text="Play in Snag" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource GhostButton}" Height="40" Margin="8,0,0,0" Click="OnQueue"
+                        ToolTip="Add to the end of the player's queue (streamed when its turn comes)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE710;" />
+                        <TextBlock Text="Queue" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="DownloadButton" Style="{StaticResource GhostButton}" Height="40" Margin="8,0,0,0" Click="OnDownloadMenu"
+                        ToolTip="Download this video as MP4 or MP3">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" />
+                        <TextBlock Text="Download" Margin="8,0,0,0" />
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE70D;" FontSize="9" Margin="8,1,0,0" Foreground="{DynamicResource MutedBrush}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Ads, account, more -->
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+                <Button x:Name="ShieldButton" Style="{StaticResource IconButton}" Width="40" Height="40" Click="OnToggleAdBlock">
+                    <Grid>
+                        <TextBlock x:Name="ShieldGlyph" Text="&#xEA18;" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="AdsBadge" Style="{StaticResource CountBadge}" Height="16" MinWidth="16" Padding="4,0" Margin="0,-15,-17,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed">
+                            <TextBlock x:Name="AdsCount" FontFamily="Segoe UI" FontSize="9.5" FontWeight="SemiBold" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </Button>
+                <Button x:Name="AccountButton" Style="{StaticResource GhostButton}" Height="40" Margin="6,0,0,0" Click="OnAccount"
+                        ToolTip="Sign in to YouTube with your Google account">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="AccountGlyph" Style="{StaticResource Glyph}" Text="&#xE77B;" />
+                        <TextBlock x:Name="AccountText" Text="Sign in" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="MoreButton" Style="{StaticResource IconButton}" Width="40" Height="40" Margin="2,0,0,0" Content="&#xE712;"
+                        ToolTip="More" Click="OnMore" />
+            </StackPanel>
+        </Grid>
+
+        <!-- ============ The page ============ -->
+        <Border x:Name="PageFrame" Grid.Row="1" CornerRadius="12" BorderThickness="1"
+                Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+            <Grid x:Name="PageGrid">
+                <!-- A picture of the page, shown while a dialog covers it (the live page can't be drawn under one) -->
+                <Image x:Name="Snapshot" Stretch="Fill" Visibility="Collapsed" />
+
+                <StackPanel x:Name="StartingState" Width="200" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
+                    <ProgressBar Style="{StaticResource SlimProgress}" IsIndeterminate="True" />
+                    <TextBlock Text="Opening YouTube…" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                </StackPanel>
+
+                <StackPanel x:Name="ProblemState" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460">
+                    <Border Width="70" Height="70" CornerRadius="20" Background="{DynamicResource DangerSoftBrush}" HorizontalAlignment="Center">
+                        <TextBlock Style="{StaticResource Glyph}" Text="&#xE7BA;" FontSize="26" Foreground="{DynamicResource DangerBrush}" HorizontalAlignment="Center" />
+                    </Border>
+                    <TextBlock x:Name="ProblemTitle" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
+                               TextWrapping="Wrap" Margin="0,20,0,6" />
+                    <TextBlock x:Name="ProblemText" Style="{StaticResource Muted}" FontSize="13" TextAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                        <Button x:Name="GetEngineButton" Style="{StaticResource PrimaryButton}" Click="OnGetEngine" Margin="0,0,10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE896;" />
+                                <TextBlock Text="Get WebView2" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Height="40" Click="OnRetry">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Glyph}" Text="&#xE72C;" />
+                                <TextBlock Text="Try again" Margin="8,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+                <!-- The WebView2 page is added here by code the first time the tab is opened. -->
+            </Grid>
+        </Border>
+
+        <!-- Toasts. The page is a native window that hides anything WPF draws over it, so this one floats above it. -->
+        <Popup x:Name="ToastPopup" AllowsTransparency="True" Placement="Custom" PlacementTarget="{Binding ElementName=PageFrame}"
+               StaysOpen="True" IsHitTestVisible="False" Focusable="False" PopupAnimation="Fade">
+            <Border Margin="20" Padding="16,11" CornerRadius="10" Background="{DynamicResource ToastBrush}"
+                    BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.45" />
+                </Border.Effect>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE73E;" Foreground="{DynamicResource BrandBrush}" />
+                    <TextBlock x:Name="ToastLabel" Margin="10,0,0,0" FontSize="13" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                </StackPanel>
+            </Border>
+        </Popup>
+    </Grid>
+</UserControl>

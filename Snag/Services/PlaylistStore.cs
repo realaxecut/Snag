@@ -26,7 +26,8 @@ public static class PlaylistStore
         {
             if (!File.Exists(FilePath)) return [];
             var playlists = JsonSerializer.Deserialize<List<SavedPlaylistDto>>(File.ReadAllText(FilePath), Json) ?? [];
-            // Never trust what's on disk: only real local paths, sane names, sane sizes.
+            // Never trust what's on disk: only real local paths (or canonical YouTube links for streamed
+            // videos), sane names, sane sizes.
             return playlists
                 .Where(p => p is not null && !string.IsNullOrWhiteSpace(p.Id))
                 .DistinctBy(p => p.Id)
@@ -35,7 +36,8 @@ public static class PlaylistStore
                 {
                     p.Name = CleanName(p.Name);
                     p.Items = (p.Items ?? [])
-                        .Where(i => i is not null && !string.IsNullOrWhiteSpace(i.Path) && Path.IsPathFullyQualified(i.Path))
+                        .Where(i => i is not null && !string.IsNullOrWhiteSpace(i.Path) &&
+                                    (Path.IsPathFullyQualified(i.Path) || UrlGuard.CanonicalVideoUrl(i.Path) == i.Path))
                         .Take(MaxItems)
                         .ToList();
                     return p;

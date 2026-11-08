@@ -10,7 +10,7 @@ using Snag.Services;
 
 namespace Snag.ViewModels;
 
-public enum AppPage { Download, Player, Playlists, History, Settings }
+public enum AppPage { Download, Browse, Player, Playlists, History, Settings }
 
 public enum PreviewState { Empty, Loading, Video, Playlist }
 
@@ -260,8 +260,28 @@ public sealed class MainViewModel : ObservableObject
             if (!Set(ref field, value)) return;
             if (value) Page = AppPage.Player;
             OnPropertyChanged(nameof(FullscreenGlyph));
+            OnPropertyChanged(nameof(HideChrome));
         }
     }
+
+    /// <summary>A video on the YouTube tab went full screen (YouTube's own full-screen button, or F on the page).</summary>
+    public bool IsBrowserFullscreen
+    {
+        get;
+        set
+        {
+            if (Set(ref field, value)) OnPropertyChanged(nameof(HideChrome));
+        }
+    }
+
+    /// <summary>Full screen of either kind: the top bar gets out of the way.</summary>
+    public bool HideChrome => IsFullscreen || IsBrowserFullscreen;
+
+    /// <summary>
+    /// One of Snag's own dialogs is showing. The YouTube tab's page is a separate native window that would
+    /// otherwise sit on top of it, so it steps aside meanwhile.
+    /// </summary>
+    public bool IsDialogOpen { get; set => Set(ref field, value); }
 
     public string FullscreenGlyph => IsFullscreen ? "" : "";
 
@@ -755,6 +775,185 @@ public sealed class MainViewModel : ObservableObject
         }
     } = "";
 
+    // ================================================================ YouTube tab
+
+    /// <summary>Block ads on the YouTube tab.</summary>
+    public bool BrowserAdBlock
+    {
+        get => _settings.BrowserAdBlock;
+        set => UpdateSetting(() => _settings.BrowserAdBlock = value);
+    }
+
+    /// <summary>Clicking a video on the YouTube tab plays it in Snag's player instead of on the page.</summary>
+    public bool BrowserPlayInSnag
+    {
+        get => _settings.BrowserPlayInSnag;
+        set => UpdateSetting(() => _settings.BrowserPlayInSnag = value);
+    }
+
+    /// <summary>Skip sponsor reads (SponsorBlock) on the YouTube tab and in streamed videos in the player.</summary>
+    public bool BrowserSponsorBlock
+    {
+        get => _settings.BrowserSponsorBlock;
+        set => UpdateSetting(() => _settings.BrowserSponsorBlock = value);
+    }
+
+    /// <summary>Show dislike counts on the YouTube tab (Return YouTube Dislike).</summary>
+    public bool BrowserDislikes
+    {
+        get => _settings.BrowserDislikes;
+        set => UpdateSetting(() => _settings.BrowserDislikes = value);
+    }
+
+    /// <summary>Ads and ad trackers stopped on the YouTube tab since Snag started.</summary>
+    public int AdsBlocked { get; private set => Set(ref field, value); }
+
+    public void CountBlockedAd() => AdsBlocked++;
+
+    /// <summary>Asks the YouTube tab to show a page (from the player's "Open in YouTube tab").</summary>
+    public event Action<string>? BrowseRequested;
+
+    public void OpenInBrowser(string url)
+    {
+        Page = AppPage.Browse;
+        BrowseRequested?.Invoke(url);
+    }
+
+    /// <summary>Plays a YouTube video in Snag's player, streamed (nothing is downloaded). It goes right after what's playing.</summary>
+    public void PlayStream(string url, string? title, string? thumbnail)
+    {
+        if (AddStream(url, title, thumbnail, afterCurrent: true) is not { } item) return;
+        Page = AppPage.Player;
+        Player.PlayItem(item);
+    }
+
+    /// <summary>Adds a YouTube video to the end of the player's queue, to be streamed when its turn comes.</summary>
+    public void QueueStream(string url, string? title, string? thumbnail)
+    {
+        var canonical = UrlGuard.CanonicalVideoUrl(url);
+        var already = canonical is not null && Player.FindStream(canonical) is not null;
+        if (AddStream(url, title, thumbnail, afterCurrent: false) is null) return;
+        ShowToast(already ? "It's already in the queue" : "Added to the queue");
+        if (Player.IsPlaying) PrefetchNextStream();
+    }
+
+    private PlaylistItem? AddStream(string url, string? title, string? thumbnail, bool afterCurrent)
+    {
+        if (UrlGuard.CanonicalVideoUrl(url) is not { } canonical)
+        {
+            ShowToast("That isn't a YouTube video.");
+            return null;
+        }
+        if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = null;
+        var item = Player.AddStream(canonical, YouTubeMeta.CleanText(title), thumbnail, afterCurrent);
+        if (item.Title == PlaylistItem.UntitledStream) _ = FillStreamTitleAsync(item);
+        return item;
+    }
+
+    private async Task FillStreamTitleAsync(PlaylistItem item)
+    {
+        if (UrlGuard.VideoIdOf(new Uri(item.Path)) is not { } id) return;
+        if (await YouTubeMeta.GetAsync(id) is { } meta) Player.SetTitle(item, meta.Title);
+    }
+
+    /// <summary>
+    /// Downloads a YouTube video with the formats picked on the Download page (MP4 or MP3, resolution, codec,
+    /// extras). <paramref name="audioOnly"/> overrides MP4/MP3. <paramref name="fromQueue"/>: started from a
+    /// streamed video in the player's queue, which the file replaces once it's saved.
+    /// </summary>
+    public async Task DownloadVideoAsync(string url, string? title, string? thumbnail, bool? audioOnly = null, bool fromQueue = false)
+    {
+        if (UrlGuard.CanonicalVideoUrl(url) is not { } canonical || UrlGuard.VideoIdOf(new Uri(canonical)) is not { } id)
+        {
+            ShowToast("That isn't a YouTube video.");
+            return;
+        }
+        if (!ToolsReady)
+        {
+            ShowToast("Snag's tools aren't set up yet. Open the Download page to finish setting up.");
+            return;
+        }
+        var mp3 = audioOnly ?? IsMp3;
+        if (Queue.Any(q => q.CanCancel && q.Job.Url == canonical && q.IsAudio == mp3))
+        {
+            ShowToast("That's already downloading");
+            return;
+        }
+
+        string? channel = null;
+        title = YouTubeMeta.CleanText(title);
+        if (title is null or PlaylistItem.UntitledStream && await YouTubeMeta.GetAsync(id) is { } meta) (title, channel) = meta;
+        if (!UrlGuard.IsAllowedImageUrl(thumbnail)) thumbnail = UrlGuard.ThumbnailFor(id, large: true);
+
+        var options = new DownloadOptions(
+            AudioOnly: mp3,
+            VideoQuality: _settings.VideoQuality,
+            Codec: Enum.TryParse<VideoCodec>(_settings.VideoCodec, out var codec) ? codec : VideoCodec.Auto,
+            AudioQuality: _settings.AudioQuality,
+            EmbedThumbnail: EmbedThumbnail,
+            EmbedSubtitles: EmbedSubtitles && !mp3,
+            SponsorBlock: SponsorBlock);
+        AddToQueue(new DownloadItemViewModel(new DownloadJob(canonical, OutputFolder, "", options), title ?? PlaylistItem.UntitledStream, channel, thumbnail)
+        {
+            SwapsQueueStream = fromQueue,
+        });
+        ShowToast(mp3 ? "Downloading the audio as MP3" : "Downloading the video as MP4");
+        Pump();
+    }
+
+    private readonly Dictionary<string, (StreamSource Source, DateTime Utc)> _streamCache = [];
+    private readonly Dictionary<string, Task<StreamSource>> _streamLookups = [];
+
+    /// <summary>
+    /// The media URLs for a streamed video. Looking them up takes yt-dlp several seconds, so they're remembered
+    /// for an hour (YouTube's links last a few hours) and the next streamed video in the queue is looked up
+    /// while the current one plays (<see cref="PrefetchNextStream"/>). One lookup per video at a time.
+    /// </summary>
+    public Task<StreamSource> ResolveStreamAsync(string canonicalUrl, CancellationToken ct)
+    {
+        if (_streamCache.TryGetValue(canonicalUrl, out var hit) && DateTime.UtcNow - hit.Utc < TimeSpan.FromHours(1)) return Task.FromResult(hit.Source);
+        if (!ToolsReady) throw new YtDlpException("Snag's tools aren't set up yet. Open the Download page to finish setting up.");
+        if (ToolsBusy) throw new YtDlpException("Snag is updating its tools. Try again in a moment.");
+        if (!_streamLookups.TryGetValue(canonicalUrl, out var lookup))
+        {
+            lookup = LookUpStreamAsync(canonicalUrl);
+            _streamLookups[canonicalUrl] = lookup;
+        }
+        // Someone giving up on waiting (the player moved on) doesn't stop the lookup; it's kept for later.
+        return lookup.WaitAsync(ct);
+    }
+
+    private async Task<StreamSource> LookUpStreamAsync(string canonicalUrl)
+    {
+        try
+        {
+            var quality = _settings.VideoQuality;
+            // Streams are decoded in software as they play; past 1080p that's a lot of CPU for little gain on most screens.
+            if (quality == "best" || (int.TryParse(quality, out var h) && h > 1080)) quality = "1080";
+            var source = await _ytdlp.ResolveStreamAsync(canonicalUrl, quality, CancellationToken.None);
+            _streamCache[canonicalUrl] = (source, DateTime.UtcNow);
+            if (Player.FindStream(canonicalUrl) is { Title: PlaylistItem.UntitledStream } item && YouTubeMeta.CleanText(source.Title) is { } title)
+                Player.SetTitle(item, title);
+            return source;
+        }
+        finally
+        {
+            _streamLookups.Remove(canonicalUrl);
+        }
+    }
+
+    /// <summary>Looks up the next streamed video in the queue ahead of time, so it starts without a wait.</summary>
+    public void PrefetchNextStream()
+    {
+        if (!ToolsReady || ToolsBusy || Player.UpcomingStream() is not { } next) return;
+        if (_streamCache.TryGetValue(next.Path, out var hit) && DateTime.UtcNow - hit.Utc < TimeSpan.FromMinutes(50)) return;
+        _ = ResolveStreamAsync(next.Path, CancellationToken.None).ContinueWith(t => Log.Info($"Prefetching a stream failed: {t.Exception?.GetBaseException().Message}"),
+            CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+    }
+
+    /// <summary>The player couldn't use a cached stream (expired, refused): look it up afresh next time.</summary>
+    public void ForgetStream(string canonicalUrl) => _streamCache.Remove(canonicalUrl);
+
     // ================================================================ lifecycle
 
     public async Task InitializeAsync()
@@ -784,14 +983,19 @@ public sealed class MainViewModel : ObservableObject
         }, quiet: true);
     }
 
+    /// <summary>Downloads that quitting now would stop (none once quitting has been confirmed).</summary>
+    public int PendingDownloadsOnExit => _exiting ? 0 : Queue.Count(q => q.CanCancel);
+
+    /// <summary>Asks before quitting with downloads still going. True to quit.</summary>
     public bool ConfirmExit()
     {
-        if (_exiting) return true;
-        var pending = Queue.Count(q => q.CanCancel);
+        var pending = PendingDownloadsOnExit;
         if (pending == 0) return true;
-        return MessageBox.Show(
-            $"{pending} download{(pending == 1 ? " is" : "s are")} still running or waiting. Quit anyway?",
-            "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        var ok = Dialogs.Confirm("Quit Snag?",
+            $"{pending} download{(pending == 1 ? " is" : "s are")} still running or waiting, and will stop if you quit now.",
+            "Quit anyway", "Keep downloading", DialogTone.Danger, Dialogs.DownloadGlyph);
+        if (ok) _exiting = true;
+        return ok;
     }
 
     public void OnExit()
@@ -1195,7 +1399,9 @@ public sealed class MainViewModel : ObservableObject
                     // A local copy keeps the artwork working after TikTok/Instagram links expire.
                     var artwork = await ThumbnailCache.SaveAsync(item.ThumbnailUrl) ?? item.ThumbnailUrl;
                     RecordHistory(item, path, artwork);
-                    if (AddDownloadsToPlayer) Player.AddDownloaded(path, item.Title, artwork);
+                    // Downloaded from a streamed video in the queue: the file takes its place there.
+                    var swapped = item.SwapsQueueStream && Player.SwapStreamForFile(item.Job.Url, path, item.Title, artwork);
+                    if (!swapped && AddDownloadsToPlayer) Player.AddDownloaded(path, item.Title, artwork);
                 }
             }
             else
@@ -1332,10 +1538,10 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        var answer = MessageBox.Show(
-            $"Delete \"{item.Title}\" from your computer?\n\nThe file goes to the Recycle Bin, so you can still restore it from there.",
-            "Delete video", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!Dialogs.Confirm("Delete this video?",
+                $"\"{item.Title}\" will be moved to the Recycle Bin, so you can still restore it from there.",
+                "Move to Recycle Bin", "Keep it", DialogTone.Danger, Dialogs.TrashGlyph))
+            return;
 
         // Let go of the file first if the player has it open.
         Player.RemovePath(item.FilePath);
@@ -1353,10 +1559,10 @@ public sealed class MainViewModel : ObservableObject
 
     private void ClearHistory()
     {
-        var answer = MessageBox.Show(
-            "Clear the download history list? Your files stay exactly where they are.",
-            "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!Dialogs.Confirm("Clear download history?",
+                "The list of past downloads will be emptied. Your files stay exactly where they are.",
+                "Clear history", glyph: Dialogs.HistoryGlyph))
+            return;
         History.Clear();
         SaveHistory();
     }
@@ -1399,10 +1605,10 @@ public sealed class MainViewModel : ObservableObject
 
     private Task ReinstallToolsAsync()
     {
-        var answer = MessageBox.Show(
-            "Download fresh copies of yt-dlp, FFmpeg, Deno and the VLC engine? That's about 230 MB.",
-            "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return Task.CompletedTask;
+        if (!Dialogs.Confirm("Re-download all tools?",
+                "Snag will download fresh copies of yt-dlp, FFmpeg, Deno and the VLC engine and check each one. That's about 230 MB.",
+                "Re-download", glyph: Dialogs.DownloadGlyph))
+            return Task.CompletedTask;
         return RunToolsTaskAsync(async (progress, ct) =>
         {
             await _tools.ReinstallAllAsync(progress, ct);
@@ -1545,9 +1751,9 @@ public sealed class MainViewModel : ObservableObject
         if (installer is null) return;
 
         var running = Queue.Count(q => q.CanCancel);
-        if (running > 0 && MessageBox.Show(
-                $"{running} download{(running == 1 ? " is" : "s are")} still running or waiting, and will stop while Snag updates. Update now?",
-                "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (running > 0 && !Dialogs.Confirm("Update Snag now?",
+                $"{running} download{(running == 1 ? " is" : "s are")} still running or waiting, and will stop while Snag updates.",
+                "Update now", "Later", glyph: Dialogs.UpdateGlyph))
             return;
 
         if (!AppUpdater.StartInstaller(installer))

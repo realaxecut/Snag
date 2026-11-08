@@ -212,7 +212,14 @@ public partial class PlayerView : UserControl, IMediaHost
 
     private void OnShowCurrent(object sender, RoutedEventArgs e)
     {
-        if (Player?.Current is { } item) PowerActions.ShowInExplorer(item.Path);
+        if (Player?.Current is { } item) Locate(item);
+    }
+
+    /// <summary>A file is shown in Explorer; a streamed video opens on the YouTube tab.</summary>
+    private void Locate(PlaylistItem item)
+    {
+        if (item.IsStream) _vm?.OpenInBrowser(item.Path);
+        else PowerActions.ShowInExplorer(item.Path);
     }
 
     // ---------------------------------------------------------------- the VLC engine
@@ -246,6 +253,8 @@ public partial class PlayerView : UserControl, IMediaHost
                 Player?.OnMediaOpened();
                 ApplyVolume();
                 UpdateClock();
+                // If a streamed video is up next, look it up now so it starts without a wait.
+                _vm?.PrefetchNextStream();
             });
             _player.EndReached += (_, _) => Dispatcher.BeginInvoke(() =>
             {
@@ -253,7 +262,17 @@ public partial class PlayerView : UserControl, IMediaHost
             });
             _player.EncounteredError += (_, _) => Dispatcher.BeginInvoke(() =>
             {
-                if (_player?.State == VLCState.Error) Player?.OnMediaFailed("It may be damaged, incomplete, or not a video or audio file.");
+                if (_player?.State != VLCState.Error) return;
+                if (_loaded is { IsStream: true } stream)
+                {
+                    // The links may have expired or been refused: look them up afresh next time.
+                    _vm?.ForgetStream(stream.Path);
+                    Player?.OnMediaFailed("YouTube stopped sending this video. Check your connection, then try playing it again.");
+                }
+                else
+                {
+                    Player?.OnMediaFailed("It may be damaged, incomplete, or not a video or audio file.");
+                }
             });
             ApplyVolume();
             Log.Info($"VLC engine started ({_libVlc.Version})");
@@ -296,9 +315,10 @@ public partial class PlayerView : UserControl, IMediaHost
         _cues = null;
         _captionClock.Stop();
         ShowCaption(null);
-        _captionTracksReady = item.IsAudio;
+        // Streams have no file to look in (yet): captions come with downloading the video.
+        _captionTracksReady = item.IsAudio || item.IsStream;
         UpdateCaptionsButton();
-        if (item.IsAudio) return;
+        if (item.IsAudio || item.IsStream) return;
         var cts = _captionsCts = new CancellationTokenSource();
         _ = FindCaptionsAsync(item.Path, cts.Token);
     }
@@ -382,7 +402,12 @@ public partial class PlayerView : UserControl, IMediaHost
     /// <summary>The C key: captions off, or back on with the preferred track.</summary>
     private void ToggleCaptions()
     {
-        if (_vm is null || Player?.Current is not { IsAudio: false }) return;
+        if (_vm is null || Player?.Current is not { IsAudio: false } current) return;
+        if (current.IsStream)
+        {
+            _vm.ShowToast("Captions work on downloaded videos. Right-click it in the queue to download it.");
+            return;
+        }
         if (CaptionsShowing)
         {
             _ = ChooseTrackAsync(null);
@@ -590,13 +615,17 @@ public partial class PlayerView : UserControl, IMediaHost
 
     private void UpdateCaptionsButton()
     {
-        var isVideo = Player?.Current is { IsAudio: false };
+        var current = Player?.Current;
+        var isStream = current is { IsStream: true };
+        var isVideo = current is { IsAudio: false, IsStream: false };
         var showing = CaptionsShowing;
         CaptionsButton.IsEnabled = isVideo;
         CaptionsDot.Visibility = showing ? Visibility.Visible : Visibility.Collapsed;
         if (showing) CaptionsButton.SetResourceReference(ForegroundProperty, "BrandBrush");
         else CaptionsButton.ClearValue(ForegroundProperty);
-        CaptionsButton.ToolTip = !isVideo ? "Captions (videos only)" : showing ? "Captions: on (C)" : "Captions: off (C)";
+        CaptionsButton.ToolTip = isStream ? "Captions work on downloaded videos"
+            : !isVideo ? "Captions (videos only)"
+            : showing ? "Captions: on (C)" : "Captions: off (C)";
     }
 
     private void ApplyVolume()
@@ -648,16 +677,97 @@ public partial class PlayerView : UserControl, IMediaHost
             return;
         }
 
+        _streamCts?.Cancel();
+        _streamCts = null;
+        _skipSegments = [];
+        if (item.IsStream)
+        {
+            // Looking the video up takes a few seconds: stop what was playing and say so straight away.
+            _player!.Stop();
+            VideoImage.Source = null;
+            LoadingText.Text = "Loading from YouTube…";
+            _loadingDelay.Stop();
+            _loadingVisible = true;
+            UpdateSurface();
+            var cts = _streamCts = new CancellationTokenSource();
+            _ = OpenStreamAsync(item, cts.Token);
+            return;
+        }
+
         // A new video keeps the previous picture until its first frame; a song or a new start doesn't.
+        LoadingText.Text = "Opening…";
         if (item.IsAudio) VideoImage.Source = null;
         if (!item.IsAudio && VideoImage.Source is null) _loadingDelay.Start();
         UpdateSurface();
+        PlayMedia(new VlcMedia(_libVlc!, item.Path, FromType.FromPath));
+    }
 
+    private CancellationTokenSource? _streamCts;
+    private IReadOnlyList<SkipSegment> _skipSegments = [];
+    private long _lastSkipToast;
+
+    /// <summary>SponsorBlock for streamed videos: where the sponsor reads are, skipped as they come up (see <see cref="SkipSponsors"/>).</summary>
+    private async Task LoadSkipSegmentsAsync(PlaylistItem item)
+    {
+        _skipSegments = [];
+        if (_vm?.BrowserSponsorBlock != true || UrlGuard.VideoIdOf(new Uri(item.Path)) is not { } id) return;
+        var segments = await YouTubeExtras.SkipSegmentsAsync(id);
+        if (_loaded == item) _skipSegments = segments;
+    }
+
+    private void SkipSponsors()
+    {
+        if (_skipSegments.Count == 0 || _seeking || _player is not { IsPlaying: true, IsSeekable: true } player || _vm?.BrowserSponsorBlock != true) return;
+        var t = player.Time / 1000.0;
+        foreach (var segment in _skipSegments)
+        {
+            if (t < segment.Start || t >= segment.End - 0.5) continue;
+            player.Time = (long)(segment.End * 1000);
+            if (Environment.TickCount64 - _lastSkipToast > 2000) _vm.ShowToast("Skipped a sponsor segment");
+            _lastSkipToast = Environment.TickCount64;
+            return;
+        }
+    }
+
+    private void PlayMedia(VlcMedia media)
+    {
         var previous = _media;
-        _media = new VlcMedia(_libVlc!, item.Path, FromType.FromPath);
+        _media = media;
         _player!.Play(_media);
         previous?.Dispose();
         _clock.Start();
+    }
+
+    /// <summary>
+    /// A video streamed from YouTube: yt-dlp finds its media links (nothing is downloaded), then VLC plays the
+    /// picture and the sound from YouTube's servers, joined together like a downloaded file.
+    /// </summary>
+    private async Task OpenStreamAsync(PlaylistItem item, CancellationToken ct)
+    {
+        if (_vm is null) return;
+        try
+        {
+            var source = await _vm.ResolveStreamAsync(item.Path, ct);
+            if (ct.IsCancellationRequested || _loaded != item || _libVlc is null || _player is null) return;
+
+            var media = new VlcMedia(_libVlc, new Uri(source.VideoUrl));
+            if (source.AudioUrl is { } audio) media.AddSlave(MediaSlaveType.Audio, 4, audio);
+            if (source.UserAgent is { } agent) media.AddOption(":http-user-agent=" + agent);
+            if (source.Referer is { } referer) media.AddOption(":http-referrer=" + referer);
+            media.AddOption(":network-caching=" + (source.IsLive ? "4000" : "2000"));
+            PlayMedia(media);
+            _ = LoadSkipSegmentsAsync(item);
+        }
+        catch (OperationCanceledException)
+        {
+            // Another item took over.
+        }
+        catch (Exception ex)
+        {
+            if (ct.IsCancellationRequested || _loaded != item) return;
+            Log.Error("Couldn't start a stream", ex);
+            Player?.OnMediaFailed(ex is YtDlpException ? ex.Message : "Couldn't load this video from YouTube.");
+        }
     }
 
     public void Play()
@@ -680,6 +790,8 @@ public partial class PlayerView : UserControl, IMediaHost
 
     public void Stop()
     {
+        _streamCts?.Cancel();
+        _streamCts = null;
         _player?.Stop();
         _clock.Stop();
         ResetClock();
@@ -687,6 +799,8 @@ public partial class PlayerView : UserControl, IMediaHost
 
     public void Close()
     {
+        _streamCts?.Cancel();
+        _streamCts = null;
         _player?.Stop();
         _loaded = null;
         _clock.Stop();
@@ -713,6 +827,7 @@ public partial class PlayerView : UserControl, IMediaHost
         if (!_seeking) SeekBar.Value = position;
         ElapsedText.Text = Fmt.Duration(_seeking ? SeekBar.Value : position);
         TotalText.Text = Fmt.Duration(total);
+        SkipSponsors();
     }
 
     private void OnSeekStart(object sender, MouseButtonEventArgs e) => _seeking = true;
@@ -861,9 +976,10 @@ public partial class PlayerView : UserControl, IMediaHost
     private void OnClearPlaylist(object sender, RoutedEventArgs e)
     {
         if (Player is not { Count: > 0 } p) return;
-        var answer = MessageBox.Show(Window.GetWindow(this)!, $"Remove all {p.Count} items from the queue? Your files stay where they are.",
-            "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer == MessageBoxResult.Yes) p.Clear();
+        if (Dialogs.Confirm("Clear the queue?",
+                $"All {(p.Count == 1 ? "1 item" : $"{p.Count} items")} will be removed from the queue. Your files stay where they are.",
+                "Clear queue", glyph: Dialogs.TrashGlyph))
+            p.Clear();
     }
 
     private void AddPaths(IEnumerable<string> paths, int? insertAt)
@@ -1019,7 +1135,23 @@ public partial class PlayerView : UserControl, IMediaHost
 
     private void OnListContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        if (PlaylistBox.SelectedItem is null) e.Handled = true;
+        // Right-click picks the row under the pointer first, like Explorer.
+        if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is { DataContext: PlaylistItem under }) PlaylistBox.SelectedItem = under;
+        if (PlaylistBox.SelectedItem is not PlaylistItem item)
+        {
+            e.Handled = true;
+            return;
+        }
+        LocateMenuItem.Header = item.LocateText;
+        var download = item.IsStream ? Visibility.Visible : Visibility.Collapsed;
+        DownloadMenuSeparator.Visibility = DownloadVideoMenuItem.Visibility = DownloadAudioMenuItem.Visibility = download;
+    }
+
+    /// <summary>The download button on a streamed video's row: MP4 or MP3, whichever the Download page is set to.</summary>
+    private void OnDownloadItem(object sender, RoutedEventArgs e)
+    {
+        if (ItemOf(sender) is { IsStream: true } item && _vm is not null)
+            _ = _vm.DownloadVideoAsync(item.Path, item.Title, item.ArtworkUrl, fromQueue: true);
     }
 
     private void OnMenuClick(object sender, RoutedEventArgs e)
@@ -1028,7 +1160,13 @@ public partial class PlayerView : UserControl, IMediaHost
         switch ((sender as MenuItem)?.Tag as string)
         {
             case "play": p.PlayItem(item); break;
-            case "show": PowerActions.ShowInExplorer(item.Path); break;
+            case "show": Locate(item); break;
+            case "dl-mp4" when item.IsStream && _vm is not null:
+                _ = _vm.DownloadVideoAsync(item.Path, item.Title, item.ArtworkUrl, audioOnly: false, fromQueue: true);
+                break;
+            case "dl-mp3" when item.IsStream && _vm is not null:
+                _ = _vm.DownloadVideoAsync(item.Path, item.Title, item.ArtworkUrl, audioOnly: true, fromQueue: true);
+                break;
             case "top": p.Move(item, 0); break;
             case "up": p.Move(item, p.Items.IndexOf(item) - 1); break;
             case "down": p.Move(item, p.Items.IndexOf(item) + 1); break;

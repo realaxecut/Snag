@@ -18,6 +18,9 @@ public static class AppPaths
     public static string SettingsFile => Path.Combine(DataDir, "settings.json");
     public static string LogFile => Path.Combine(DataDir, "snag.log");
 
+    /// <summary>The YouTube tab's browser profile: its sign-in, cookies and cache. Snag itself never reads it.</summary>
+    public static string BrowserDir => Path.Combine(DataDir, "browser");
+
     /// <summary>The user's real Downloads folder (it may have been moved), plus a Snag subfolder.</summary>
     public static string DefaultDownloadsDir()
     {

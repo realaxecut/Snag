@@ -214,9 +214,10 @@ public sealed class PlaylistsViewModel : ObservableObject
     private void Delete()
     {
         if (Selected is not { } playlist) return;
-        var answer = MessageBox.Show($"Delete the playlist \"{playlist.DisplayName}\"? The videos and songs themselves stay where they are.",
-            "Snag", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!Dialogs.Confirm("Delete this playlist?",
+                $"\"{playlist.DisplayName}\" will be deleted. The videos and songs in it stay where they are.",
+                "Delete playlist", tone: DialogTone.Danger, glyph: Dialogs.TrashGlyph))
+            return;
         var index = Playlists.IndexOf(playlist);
         Playlists.Remove(playlist);
         Selected = Playlists.Count == 0 ? null : Playlists[Math.Min(index, Playlists.Count - 1)];

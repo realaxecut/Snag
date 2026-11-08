@@ -96,7 +96,7 @@
                     <!-- Opening a video (only shown if the first frame takes a moment) -->
                     <StackPanel x:Name="LoadingState" Visibility="Collapsed" Width="180" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False">
                         <ProgressBar Style="{StaticResource SlimProgress}" IsIndeterminate="True" />
-                        <TextBlock Text="Opening…" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                        <TextBlock x:Name="LoadingText" Text="Opening…" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" HorizontalAlignment="Center" Margin="0,10,0,0" />
                     </StackPanel>
 
                     <!-- Paused: a big play symbol over the picture -->
@@ -127,7 +127,7 @@
                         <Border Width="70" Height="70" CornerRadius="20" Background="#33FF8080" HorizontalAlignment="Center">
                             <TextBlock Style="{StaticResource Glyph}" Text="&#xE783;" FontSize="26" Foreground="{DynamicResource DangerBrush}" HorizontalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="Couldn't play this file" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,6" />
+                        <TextBlock Text="{Binding Player.Current.ErrorHeading}" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,6" />
                         <TextBlock Text="{Binding Player.Current.Title}" Foreground="White" FontSize="13" TextAlignment="Center" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Player.Current.Error}" Foreground="{DynamicResource MutedBrush}" FontSize="12.5" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
@@ -140,7 +140,7 @@
                             <Button Style="{StaticResource GhostButton}" Height="38" Margin="10,0,0,0" Click="OnShowCurrent">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE8B7;" />
-                                    <TextBlock Text="Show in folder" Margin="8,0,0,0" />
+                                    <TextBlock Text="{Binding Player.Current.LocateText}" Margin="8,0,0,0" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
@@ -285,7 +285,11 @@
                     <ListBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Play" Tag="play" Click="OnMenuClick" />
-                            <MenuItem Header="Show in folder" Tag="show" Click="OnMenuClick" />
+                            <MenuItem x:Name="LocateMenuItem" Header="Show in folder" Tag="show" Click="OnMenuClick" />
+                            <!-- Streamed YouTube videos only -->
+                            <Separator x:Name="DownloadMenuSeparator" />
+                            <MenuItem x:Name="DownloadVideoMenuItem" Header="Download video (MP4)" Tag="dl-mp4" Click="OnMenuClick" />
+                            <MenuItem x:Name="DownloadAudioMenuItem" Header="Download audio (MP3)" Tag="dl-mp3" Click="OnMenuClick" />
                             <Separator />
                             <MenuItem Header="Move to top" Tag="top" Click="OnMenuClick" />
                             <MenuItem Header="Move up" Tag="up" Click="OnMenuClick" InputGestureText="Alt+Up" />
@@ -325,6 +329,9 @@
                                                TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
                                 </StackPanel>
                                 <StackPanel x:Name="Actions" Grid.Column="3" Orientation="Horizontal" Visibility="Hidden">
+                                    <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE896;"
+                                            ToolTip="Download (MP4 or MP3, as set on the Download page)" Click="OnDownloadItem"
+                                            Visibility="{Binding IsStream, Converter={StaticResource Vis}}" />
                                     <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE70E;" ToolTip="Move up" Click="OnMoveUp" />
                                     <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE70D;" ToolTip="Move down" Click="OnMoveDown" />
                                     <Button Style="{StaticResource IconButton}" Width="26" Height="26" FontSize="11" Content="&#xE711;" ToolTip="Remove" Click="OnRemove" />

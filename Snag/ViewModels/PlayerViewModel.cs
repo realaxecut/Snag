@@ -28,18 +28,49 @@ public sealed class PlaylistItem : ObservableObject
         ".mp3", ".m4a", ".aac", ".wav", ".wma", ".flac", ".ogg", ".opus",
     };
 
+    public const string UntitledStream = "YouTube video";
+
+    /// <summary>
+    /// <paramref name="path"/> is a file on the PC, or (for a video streamed from YouTube without downloading
+    /// it) its canonical watch link; see <see cref="UrlGuard.CanonicalVideoUrl"/>.
+    /// </summary>
     public PlaylistItem(string path, string? title = null, string? artworkUrl = null)
     {
         Path = path;
-        Title = string.IsNullOrWhiteSpace(title) ? System.IO.Path.GetFileNameWithoutExtension(path) : title;
+        IsStream = IsStreamPath(path);
         ArtworkUrl = artworkUrl;
+        if (IsStream)
+        {
+            Title = string.IsNullOrWhiteSpace(title) ? UntitledStream : title;
+            Kind = "Streaming from YouTube";
+            if (artworkUrl is null && UrlGuard.VideoIdOf(new Uri(path)) is { } id) ArtworkUrl = UrlGuard.ThumbnailFor(id);
+            return;
+        }
+        Title = string.IsNullOrWhiteSpace(title) ? System.IO.Path.GetFileNameWithoutExtension(path) : title;
         var extension = System.IO.Path.GetExtension(path);
         IsAudio = AudioExtensions.Contains(extension);
         Kind = $"{(IsAudio ? "Audio" : "Video")} · {extension.TrimStart('.').ToUpperInvariant()}";
     }
 
+    /// <summary>A canonical YouTube watch link (as opposed to a file path).</summary>
+    public static bool IsStreamPath(string? path) =>
+        path is not null && path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && UrlGuard.CanonicalVideoUrl(path) == path;
+
+    /// <summary>Streams are always "there"; files have to still exist.</summary>
+    public static bool IsAvailable(string path) => IsStreamPath(path) || File.Exists(path);
+
     public string Path { get; }
-    public string Title { get; }
+
+    /// <summary>Streams start with what the YouTube tab knew and get the real title once it's looked up.</summary>
+    public string Title { get; set => Set(ref field, value); }
+
+    /// <summary>Played straight from YouTube, not from a file.</summary>
+    public bool IsStream { get; }
+
+    public string ErrorHeading => IsStream ? "Couldn't play this video" : "Couldn't play this file";
+
+    /// <summary>The "where is it" action: a file is shown in Explorer, a stream opens in the YouTube tab.</summary>
+    public string LocateText => IsStream ? "Open in YouTube tab" : "Show in folder";
 
     /// <summary>The download's thumbnail, or (for files from the PC) a frame from the video or the song's cover art.</summary>
     public string? ArtworkUrl { get; set => Set(ref field, value); }
@@ -68,7 +99,7 @@ public sealed class PlaylistItem : ObservableObject
     /// </summary>
     public async Task<bool> LoadArtworkAsync()
     {
-        if (Missing) return false;
+        if (Missing || IsStream) return false;
         if (ArtworkUrl is { } art && !(ThumbnailCache.IsCachedPath(art) && !File.Exists(art))) return false;
         var picture = await FrameGrabber.GetAsync(Path, IsAudio);
         if (picture is null) return false;
@@ -98,8 +129,8 @@ public sealed class PlayerViewModel : ObservableObject
         _changed = changed;
         _notify = notify;
         Volume = volume;
-        foreach (var entry in saved.Where(e => !string.IsNullOrWhiteSpace(e.Path)))
-            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !File.Exists(entry.Path) });
+        foreach (var entry in saved.Where(IsUsable))
+            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !PlaylistItem.IsAvailable(entry.Path) });
         Renumber();
         foreach (var item in Items) _ = EnsureArtworkAsync(item);
 
@@ -283,14 +314,82 @@ public sealed class PlayerViewModel : ObservableObject
     {
         if (replace) Clear();
         var added = 0;
-        foreach (var entry in entries)
+        foreach (var entry in entries.Where(IsUsable))
         {
             if (Find(entry.Path) is not null) continue;
-            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !File.Exists(entry.Path) });
+            Items.Add(new PlaylistItem(entry.Path, entry.Title, entry.ArtworkUrl) { Missing = !PlaylistItem.IsAvailable(entry.Path) });
             added++;
         }
         if (replace) PlayFromStart();
         return added;
+    }
+
+    /// <summary>A local path, or a canonical YouTube link; anything else from disk is dropped.</summary>
+    private static bool IsUsable(PlaylistEntryDto entry) =>
+        !string.IsNullOrWhiteSpace(entry.Path) && (PlaylistItem.IsStreamPath(entry.Path) || Path.IsPathFullyQualified(entry.Path));
+
+    /// <summary>
+    /// A YouTube video to stream (nothing is downloaded). <paramref name="afterCurrent"/> puts it right after
+    /// what's playing; otherwise at the end. A video already queued is returned as it is.
+    /// </summary>
+    public PlaylistItem AddStream(string canonicalUrl, string? title, string? artworkUrl, bool afterCurrent)
+    {
+        if (Find(canonicalUrl) is { } existing) return existing;
+        var item = new PlaylistItem(canonicalUrl, title, artworkUrl);
+        var index = afterCurrent && Current is { } current ? Items.IndexOf(current) + 1 : Items.Count;
+        Items.Insert(Math.Clamp(index, 0, Items.Count), item);
+        return item;
+    }
+
+    /// <summary>Gives a stream its real title once it's known (and remembers it with the queue).</summary>
+    public void SetTitle(PlaylistItem item, string title)
+    {
+        if (string.IsNullOrWhiteSpace(title) || item.Title == title) return;
+        item.Title = title;
+        if (Items.Contains(item)) _changed();
+    }
+
+    public bool HasUntitledStream(string canonicalUrl) =>
+        Find(canonicalUrl) is { IsStream: true, Title: PlaylistItem.UntitledStream };
+
+    public PlaylistItem? FindStream(string canonicalUrl) => Find(canonicalUrl) is { IsStream: true } item ? item : null;
+
+    /// <summary>The item that plays after this one if it's a streamed video (with shuffle on there's no telling, so none).</summary>
+    public PlaylistItem? UpcomingStream()
+    {
+        if (Shuffle || Current is null || Repeat == RepeatMode.One) return null;
+        var index = Items.IndexOf(Current);
+        var next = index >= 0 && index + 1 < Items.Count ? Items[index + 1]
+            : Repeat == RepeatMode.All && Items.Count > 1 ? Items[0]
+            : null;
+        return next is { IsStream: true, Missing: false } ? next : null;
+    }
+
+    private readonly Dictionary<PlaylistItem, PlaylistItem> _pendingSwaps = [];
+
+    /// <summary>
+    /// A streamed video was downloaded: the queue gets the file in the stream's place. If the stream is playing
+    /// right now it's swapped as soon as playback moves on, so nothing is interrupted. False if it isn't queued.
+    /// </summary>
+    public bool SwapStreamForFile(string canonicalUrl, string path, string title, string? artworkUrl)
+    {
+        if (FindStream(canonicalUrl) is not { } stream) return false;
+        if (Find(path) is not null)
+        {
+            if (stream != Current) Items.Remove(stream);
+            return true;
+        }
+        var file = new PlaylistItem(path, title, artworkUrl);
+        if (stream == Current) _pendingSwaps[stream] = file;
+        else Items[Items.IndexOf(stream)] = file;
+        return true;
+    }
+
+    private void ApplyPendingSwap(PlaylistItem? leaving)
+    {
+        if (leaving is null || !_pendingSwaps.Remove(leaving, out var file)) return;
+        var index = Items.IndexOf(leaving);
+        if (index >= 0 && Find(file.Path) is null) Items[index] = file;
     }
 
     private async Task EnsureArtworkAsync(PlaylistItem item)
@@ -306,6 +405,7 @@ public sealed class PlayerViewModel : ObservableObject
         {
             previous.IsCurrent = false;
             if (rememberPrevious && previous != item) _history.Push(previous);
+            if (previous != item) ApplyPendingSwap(previous);
         }
         IsFinished = false;
         Current = item;
@@ -313,7 +413,7 @@ public sealed class PlayerViewModel : ObservableObject
         item.Error = null;
         _playedThisRound.Add(item);
 
-        if (!File.Exists(item.Path))
+        if (!PlaylistItem.IsAvailable(item.Path))
         {
             item.Missing = true;
             OnMediaFailed("The file was moved or deleted.");
@@ -472,6 +572,7 @@ public sealed class PlayerViewModel : ObservableObject
             IsFinished = false;
             Current = null;
         }
+        _pendingSwaps.Remove(item);
         Items.Remove(item);
     }
 
@@ -488,13 +589,18 @@ public sealed class PlayerViewModel : ObservableObject
         Current = null;
         _history.Clear();
         _playedThisRound.Clear();
+        _pendingSwaps.Clear();
         Items.Clear();
     }
 
     public List<PlaylistEntryDto> Snapshot() => Items.Select(i => i.ToDto()).ToList();
 
-    private PlaylistItem? Find(string path) =>
-        Items.FirstOrDefault(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase));
+    private PlaylistItem? Find(string path)
+    {
+        // YouTube video IDs are case-sensitive; Windows paths aren't.
+        var comparison = PlaylistItem.IsStreamPath(path) ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        return Items.FirstOrDefault(i => string.Equals(i.Path, path, comparison));
+    }
 
     private void Renumber()
     {

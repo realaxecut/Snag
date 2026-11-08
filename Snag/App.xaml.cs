@@ -31,7 +31,7 @@ public partial class App : Application
     private static void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log.Error("Unhandled UI exception", e.Exception);
-        MessageBox.Show(e.Exception.Message, "Snag ran into a problem", MessageBoxButton.OK, MessageBoxImage.Warning);
         e.Handled = true;
+        Dialogs.Notice("Snag ran into a problem", e.Exception.Message);
     }
 }

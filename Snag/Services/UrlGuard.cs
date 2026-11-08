@@ -97,6 +97,31 @@ public static partial class UrlGuard
 
     public static bool IsValidVideoId(string? id) => id is not null && VideoIdPattern().IsMatch(id);
 
+    /// <summary>
+    /// A single YouTube video (watch, Shorts, youtu.be, live or embed link) in one canonical form,
+    /// https://www.youtube.com/watch?v=ID, or null. Used for videos streamed in the player and links
+    /// from the YouTube tab, so the same video is always the same string.
+    /// </summary>
+    public static string? CanonicalVideoUrl(string? url) =>
+        TryParse(url, out var uri, out _) && SiteOf(uri) == Site.YouTube && VideoIdOf(uri) is { } id ? WatchUrl(id) : null;
+
+    /// <summary>Hosts YouTube streams media from (what yt-dlp hands the player). https only.</summary>
+    public static bool IsAllowedStreamUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+        uri.Scheme == Uri.UriSchemeHttps &&
+        (("." + uri.Host).EndsWith(".googlevideo.com", StringComparison.OrdinalIgnoreCase) ||
+         ("." + uri.Host).EndsWith(".youtube.com", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Where the YouTube tab may go: YouTube itself and Google's sign-in pages. Everything else opens in the real browser.</summary>
+    public static bool IsBrowserHost(string? host)
+    {
+        if (string.IsNullOrEmpty(host)) return false;
+        var dotted = "." + host.ToLowerInvariant();
+        return dotted.EndsWith(".youtube.com", StringComparison.Ordinal) ||
+               dotted is ".youtu.be" or ".youtube-nocookie.com" or ".www.youtube-nocookie.com" ||
+               dotted.EndsWith(".google.com", StringComparison.Ordinal);
+    }
+
     public static string WatchUrl(string videoId) => $"https://www.youtube.com/watch?v={videoId}";
 
     public static string ThumbnailFor(string videoId, bool large = false) =>
