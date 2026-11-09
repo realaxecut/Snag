@@ -243,8 +243,19 @@ public partial class BrowserView : UserControl
             case nameof(MainViewModel.IsOptionsPopupOpen):
                 UpdateCover();
                 break;
-            case nameof(MainViewModel.AdsBlocked) or nameof(MainViewModel.BrowserAdBlock):
+            case nameof(MainViewModel.AdsBlocked):
                 UpdateShield();
+                break;
+            // These can change here (the shield, the ⋯ menu) or on the Settings page; either way the page catches up.
+            case nameof(MainViewModel.BrowserAdBlock):
+                UpdateShield();
+                _ = ReloadWithScriptAsync();
+                break;
+            case nameof(MainViewModel.BrowserPlayInSnag):
+                SendMode();
+                break;
+            case nameof(MainViewModel.BrowserSponsorBlock) or nameof(MainViewModel.BrowserDislikes):
+                _ = SendVideoInfoAsync();
                 break;
             case nameof(MainViewModel.IsBrowserFullscreen):
                 ApplyFullscreen(_vm!.IsBrowserFullscreen);
@@ -330,15 +341,74 @@ public partial class BrowserView : UserControl
 
     private void OnSitePill(object sender, RoutedEventArgs e) => OpenSite((sender as FrameworkElement)?.Tag as string);
 
-    private void OnSite(object sender, RoutedEventArgs e) => OpenSite((sender as FrameworkElement)?.Tag as string);
+    private bool _syncingSwitcher;
+    private bool _switchedByCheck;
 
-    /// <summary>Goes to a site's home page (and past the start screen, if it's showing).</summary>
-    private void OpenSite(string? id)
+    /// <summary>A site picked in the switcher (by click, keyboard or accessibility tools): go there.</summary>
+    private void OnSiteChecked(object sender, RoutedEventArgs e)
+    {
+        if (_syncingSwitcher) return;
+        _switchedByCheck = true;
+        // The click that picked it (if it was one) arrives right after; it mustn't count as a second click.
+        Dispatcher.BeginInvoke(() => _switchedByCheck = false, DispatcherPriority.Input);
+        OpenSite((sender as FrameworkElement)?.Tag as string);
+    }
+
+    /// <summary>A click on the site you're already on: its home page.</summary>
+    private void OnSiteClick(object sender, RoutedEventArgs e)
+    {
+        if (_switchedByCheck)
+        {
+            _switchedByCheck = false;
+            return;
+        }
+        OpenSite((sender as FrameworkElement)?.Tag as string);
+    }
+
+    /// <summary>
+    /// Goes to a site (and past the start screen, if it's showing). Switching to another site opens the page you
+    /// were last on there (Settings: remember where you were); clicking the site you're on goes to its home page.
+    /// </summary>
+    private async void OpenSite(string? id)
     {
         var site = id switch { "tiktok" => Sites[1], "instagram" => Sites[2], _ => Sites[0] };
+        var switching = _siteChosen && site.Site != _site.Site;
+        // Leaving a YouTube video: remember how far in it was, so coming back carries on from there.
+        if (switching && _videoUrl is not null && _vm?.BrowserRememberPages == true) await RememberVideoTimeAsync();
         _site = site;
         UpdateSiteSwitcher();
-        Navigate(site.Home);
+        var target = switching && _vm?.BrowserRememberPages == true && _lastPages.TryGetValue(site.Site, out var last) ? last : site.Home;
+        Navigate(target);
+    }
+
+    /// <summary>The page last shown on each site this session (just its link; the page itself isn't kept).</summary>
+    private readonly Dictionary<Site, string> _lastPages = [];
+
+    private void RememberPage(string? source)
+    {
+        if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) return;
+        if (UrlGuard.BrowserSiteOf(uri.Host) is { } site) _lastPages[site] = uri.AbsoluteUri;
+    }
+
+    /// <summary>Saves the YouTube video's link with its current time (t=), read from the page's player.</summary>
+    private async Task RememberVideoTimeAsync()
+    {
+        if (_core is null || !Uri.TryCreate(_core.Source, UriKind.Absolute, out var page)) return;
+        try
+        {
+            var result = await _core.ExecuteScriptAsync(
+                "(() => { const v = document.querySelector('#movie_player video'); return v && isFinite(v.currentTime) ? Math.floor(v.currentTime) : -1; })()");
+            if (!int.TryParse(result, out var seconds) || seconds < 5) return;
+            // Keep the rest of the link (a playlist, say) and replace any old time.
+            var query = page.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
+                .Where(p => !p.StartsWith("t=", StringComparison.Ordinal))
+                .Append($"t={seconds}s");
+            _lastPages[Site.YouTube] = $"https://{page.Host}{page.AbsolutePath}?{string.Join('&', query)}";
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"Couldn't read the video's time: {ex.Message}");
+        }
     }
 
     private void ShowChooser(bool show)
@@ -369,9 +439,11 @@ public partial class BrowserView : UserControl
 
     private void UpdateSiteSwitcher()
     {
+        _syncingSwitcher = true;
         YouTubeSite.IsChecked = _site.Site == Site.YouTube;
         TikTokSite.IsChecked = _site.Site == Site.TikTok;
         InstagramSite.IsChecked = _site.Site == Site.Instagram;
+        _syncingSwitcher = false;
         AddressHint.Text = $"Search {_site.Name} or paste a link";
     }
 
@@ -418,6 +490,9 @@ public partial class BrowserView : UserControl
         core.SourceChanged += (_, _) =>
         {
             _titleFresh = false;
+            // Only when the address itself changes (not on every title change), so a link saved with the video's
+            // time when switching sites isn't overwritten by the old page's last updates.
+            RememberPage(core.Source);
             OnPageChanged();
         };
         core.HistoryChanged += (_, _) => OnPageChanged();
@@ -515,11 +590,17 @@ public partial class BrowserView : UserControl
         _vm.CountBlockedAd();
     }
 
-    private async void OnToggleAdBlock(object sender, RoutedEventArgs e)
+    private void OnToggleAdBlock(object sender, RoutedEventArgs e)
     {
         if (_vm is null) return;
-        _vm.BrowserAdBlock = !_vm.BrowserAdBlock;
+        _vm.BrowserAdBlock = !_vm.BrowserAdBlock; // the page reloads with it (OnMainPropertyChanged)
         _vm.ShowToast(_vm.BrowserAdBlock ? "Ad blocking is on" : "Ad blocking is off");
+    }
+
+    /// <summary>Ad blocking was switched: the page script is swapped and the page reloaded so it takes effect.</summary>
+    private async Task ReloadWithScriptAsync()
+    {
+        if (_core is null) return;
         try
         {
             await InstallScriptAsync();
@@ -1016,10 +1097,10 @@ public partial class BrowserView : UserControl
         if (_vm is null) return;
         var menu = NewMenu(MoreButton, PlacementMode.Bottom);
         menu.Items.Add(MenuEntry("Block ads", _vm.BrowserAdBlock, () => OnToggleAdBlock(this, new RoutedEventArgs())));
+        // (Each switch is picked up by OnMainPropertyChanged, the same as when it's changed on the Settings page.)
         menu.Items.Add(MenuEntry("Play clicked YouTube videos in Snag's player", _vm.BrowserPlayInSnag, () =>
         {
             _vm.BrowserPlayInSnag = !_vm.BrowserPlayInSnag;
-            SendMode();
             _vm.ShowToast(_vm.BrowserPlayInSnag
                 ? "Clicking a YouTube video now plays it in Snag's player"
                 : "Clicking a YouTube video now plays it here");
@@ -1027,14 +1108,19 @@ public partial class BrowserView : UserControl
         menu.Items.Add(MenuEntry("Skip sponsor segments (SponsorBlock)", _vm.BrowserSponsorBlock, () =>
         {
             _vm.BrowserSponsorBlock = !_vm.BrowserSponsorBlock;
-            _ = SendVideoInfoAsync();
             _vm.ShowToast(_vm.BrowserSponsorBlock ? "Sponsor segments will be skipped" : "Sponsor segments won't be skipped");
         }));
         menu.Items.Add(MenuEntry("Show dislikes (Return YouTube Dislike)", _vm.BrowserDislikes, () =>
         {
             _vm.BrowserDislikes = !_vm.BrowserDislikes;
-            _ = SendVideoInfoAsync();
             _vm.ShowToast(_vm.BrowserDislikes ? "Dislike counts are on" : "Dislike counts are off");
+        }));
+        menu.Items.Add(MenuEntry("Remember where I was on each site", _vm.BrowserRememberPages, () =>
+        {
+            _vm.BrowserRememberPages = !_vm.BrowserRememberPages;
+            _vm.ShowToast(_vm.BrowserRememberPages
+                ? "Switching sites brings you back to where you were"
+                : "Switching sites opens each site's home page");
         }));
         menu.Items.Add(new Separator());
         var pageUrl = _core?.Source;

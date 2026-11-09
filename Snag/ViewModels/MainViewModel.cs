@@ -835,6 +835,13 @@ public sealed class MainViewModel : ObservableObject
         set => UpdateSetting(() => _settings.BrowserDislikes = value);
     }
 
+    /// <summary>Switching back to a site in the Browser tab opens the page you were last on there.</summary>
+    public bool BrowserRememberPages
+    {
+        get => _settings.BrowserRememberPages;
+        set => UpdateSetting(() => _settings.BrowserRememberPages = value);
+    }
+
     /// <summary>Ads and ad trackers stopped in the Browser tab since Snag started.</summary>
     public int AdsBlocked { get; private set => Set(ref field, value); }
 

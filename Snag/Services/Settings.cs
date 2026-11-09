@@ -39,6 +39,9 @@ public sealed class AppSettings
     /// <summary>YouTube in the Browser tab: show the dislike count (Return YouTube Dislike).</summary>
     public bool BrowserDislikes { get; set; } = true;
 
+    /// <summary>Browser tab: switching back to a site opens the page you were last on there (just its link is kept).</summary>
+    public bool BrowserRememberPages { get; set; } = true;
+
     public double Volume { get; set; } = 0.8;
     public bool Shuffle { get; set; }
     public string Repeat { get; set; } = "Off";

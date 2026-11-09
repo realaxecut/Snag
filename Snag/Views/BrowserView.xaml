@@ -111,11 +111,11 @@
                     Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1">
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="YouTubeSite" Style="{StaticResource Segment}" GroupName="BrowserSite" Width="84" Height="32"
-                                 Content="YouTube" Tag="youtube" Click="OnSite" ToolTip="YouTube home" />
+                                 Content="YouTube" Tag="youtube" Checked="OnSiteChecked" Click="OnSiteClick" ToolTip="YouTube home" />
                     <RadioButton x:Name="TikTokSite" Style="{StaticResource Segment}" GroupName="BrowserSite" Width="72" Height="32"
-                                 Content="TikTok" Tag="tiktok" Click="OnSite" ToolTip="TikTok home" />
+                                 Content="TikTok" Tag="tiktok" Checked="OnSiteChecked" Click="OnSiteClick" ToolTip="TikTok home" />
                     <RadioButton x:Name="InstagramSite" Style="{StaticResource Segment}" GroupName="BrowserSite" Width="92" Height="32"
-                                 Content="Instagram" Tag="instagram" Click="OnSite" ToolTip="Instagram home" />
+                                 Content="Instagram" Tag="instagram" Checked="OnSiteChecked" Click="OnSiteClick" ToolTip="Instagram home" />
                 </StackPanel>
             </Border>
 
