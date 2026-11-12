@@ -66,6 +66,11 @@ Snag checks this repository for a new release each time it starts (**Settings â†
 - **Shut down when playlist ends**: once the last item finishes playing (streamed videos count too), a 60-second countdown appears with a big **Cancel** button (or press `Esc`). Then Windows shuts down normally. Apps with unsaved work can still stop it, because Snag never forces it.
   - The switch is off every time Snag starts.
   - Repeat and this switch turn each other off, since a repeating playlist never ends.
+- **Nuclear mode** (the lock button next to **CC**, or right-click a video in the queue): that one video plays full screen and there's no leaving it until it ends.
+  - Leaving full screen, the keyboard (volume keys aside), Alt+F4, Alt+Tab, the Windows key and closing Snag all stop working. Clicking another monitor brings Snag straight back. You can still seek, pause and change the volume with the mouse.
+  - When the video ends, a **10-second** shutdown countdown appears. Clicking **Cancel shutdown** (or `Esc`) is the way out; otherwise Windows shuts down normally.
+  - If the video can't play, nuclear mode simply ends and nothing shuts down.
+  - Ctrl+Alt+Delete still works, because Windows doesn't let any app block it. If Snag ever closes or crashes, the keyboard lock goes with it.
 
 **Playlists**
 - Make as many playlists as you like, and name each one (just type over the name).

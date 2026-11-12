@@ -183,7 +183,14 @@
                     <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="{Binding Player.Current.Title, FallbackValue='Nothing playing', TargetNullValue='Nothing playing'}"
                                    FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Player.PositionText}" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,3,0,0" />
+                        <TextBlock Text="{Binding Player.PositionText}" Foreground="{DynamicResource MutedBrush}" FontSize="12" Margin="0,3,0,0"
+                                   Visibility="{Binding IsNuclear, Converter={StaticResource Vis}, ConverterParameter=!}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0" Visibility="{Binding IsNuclear, Converter={StaticResource Vis}}"
+                                    ToolTip="No way out until the video ends. Then cancel the shutdown.">
+                            <TextBlock Style="{StaticResource Glyph}" Text="&#xE72E;" FontSize="11" Foreground="{DynamicResource DangerBrush}" />
+                            <TextBlock Text="Nuclear mode · the only way out is the end" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource DangerBrush}" Margin="6,0,0,0" />
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Shuffle: purple with a dot when on -->
@@ -231,6 +238,11 @@
                         <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;" Foreground="{DynamicResource BrandBrush}" Margin="0,0,10,0"
                                    ToolTip="Shuts down when the playlist ends"
                                    Visibility="{Binding Player.ShutdownWhenDone, Converter={StaticResource Vis}}" />
+                        <!-- Nuclear mode: lock this video in full screen until it ends -->
+                        <Button Style="{StaticResource IconButton}" Margin="0,0,4,0" Content="&#xE72E;" Click="OnNuclear"
+                                ToolTip="Nuclear mode: lock this video in full screen until it ends"
+                                Visibility="{Binding IsNuclear, Converter={StaticResource Vis}, ConverterParameter=!}"
+                                IsEnabled="{Binding Player.HasCurrent}" />
                         <!-- Captions: on/off, pick a track, or add a subtitle file. Coloured, with a dot, while captions show. -->
                         <Button x:Name="CaptionsButton" Style="{StaticResource IconButton}" Margin="0,0,4,0" ToolTip="Captions: off (C)" Click="OnCaptionsClick">
                             <Grid>
@@ -243,7 +255,8 @@
                         <Slider Width="110" Style="{StaticResource MediaSlider}" Minimum="0" Maximum="1" Value="{Binding Player.Volume}"
                                 VerticalAlignment="Center" Margin="4,0,8,0" ToolTip="Volume (Up / Down)" />
                         <Button Style="{StaticResource IconButton}" Content="{Binding FullscreenGlyph}" Command="{Binding ToggleFullscreenCommand}"
-                                ToolTip="Full screen (F, Esc to leave)" />
+                                ToolTip="Full screen (F, Esc to leave)"
+                                Visibility="{Binding IsNuclear, Converter={StaticResource Vis}, ConverterParameter=!}" />
                     </StackPanel>
                 </Grid>
             </Grid>
@@ -285,6 +298,7 @@
                     <ListBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Play" Tag="play" Click="OnMenuClick" />
+                            <MenuItem Header="Nuclear mode…" Tag="nuclear" Click="OnMenuClick" />
                             <MenuItem x:Name="LocateMenuItem" Header="Show in folder" Tag="show" Click="OnMenuClick" />
                             <!-- Streamed YouTube videos only -->
                             <Separator x:Name="DownloadMenuSeparator" />

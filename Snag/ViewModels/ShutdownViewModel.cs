@@ -4,10 +4,14 @@ using Snag.Services;
 
 namespace Snag.ViewModels;
 
-/// <summary>The 60-second, always-cancellable countdown shown before Snag turns the PC off.</summary>
+/// <summary>
+/// The always-cancellable countdown shown before Snag turns the PC off: 60 seconds after a playlist, 10 at the end
+/// of nuclear mode.
+/// </summary>
 public sealed class ShutdownViewModel : ObservableObject
 {
     public const int CountdownSeconds = 60;
+    private int _total = CountdownSeconds;
 
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly Func<int> _activeDownloads;
@@ -43,14 +47,19 @@ public sealed class ShutdownViewModel : ObservableObject
         }
     }
 
-    public double Fraction => SecondsLeft / (double)CountdownSeconds;
+    public double Fraction => SecondsLeft / (double)_total;
     public string Message => $"Your PC will shut down in {SecondsLeft} second{(SecondsLeft == 1 ? "" : "s")}.";
     public string? Warning { get; private set => Set(ref field, value); }
 
-    public void Begin()
+    /// <summary>What just ended: "Playlist finished", or "Video finished" for nuclear mode.</summary>
+    public string Heading { get; private set => Set(ref field, value); } = "Playlist finished";
+
+    public void Begin(int seconds = CountdownSeconds, string heading = "Playlist finished")
     {
         if (IsOpen) return;
-        SecondsLeft = CountdownSeconds;
+        _total = Math.Max(1, seconds);
+        Heading = heading;
+        SecondsLeft = _total;
         RefreshWarning();
         IsOpen = true;
         _timer.Start();

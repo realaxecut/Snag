@@ -205,6 +205,9 @@ public partial class PlayerView : UserControl, IMediaHost
         e.Handled = true;
     }
 
+    /// <summary>The lock button: nuclear mode for what's playing (it asks first).</summary>
+    private void OnNuclear(object sender, RoutedEventArgs e) => _vm?.StartNuclear(Player?.Current);
+
     private void OnRemoveCurrent(object sender, RoutedEventArgs e)
     {
         if (Player?.Current is { } item) Player.Remove(item);
@@ -1160,6 +1163,7 @@ public partial class PlayerView : UserControl, IMediaHost
         switch ((sender as MenuItem)?.Tag as string)
         {
             case "play": p.PlayItem(item); break;
+            case "nuclear": _vm?.StartNuclear(item); break;
             case "show": Locate(item); break;
             case "dl-mp4" when item.IsStream && _vm is not null:
                 _ = _vm.DownloadVideoAsync(item.Path, item.Title, item.ArtworkUrl, audioOnly: false, fromQueue: true);

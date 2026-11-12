@@ -30,6 +30,9 @@ public partial class MainWindow : Window
         _vm.Shutdown.Opened += OnShutdownCountdown;
         Loaded += async (_, _) => await _vm.InitializeAsync();
         Closing += OnClosing;
+        Deactivated += OnDeactivatedWhileNuclear;
+        StateChanged += OnStateChangedWhileNuclear;
+        Closed += (_, _) => _keyboardLock?.Dispose();
         SourceInitialized += (_, _) => ApplyCaptionColor();
         ThemeManager.Changed += ApplyCaptionColor;
         Closed += (_, _) => ThemeManager.Changed -= ApplyCaptionColor;
@@ -43,7 +46,88 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.HideChrome)) ApplyFullscreen(_vm.HideChrome);
         else if (e.PropertyName == nameof(MainViewModel.IsOptionsPopupOpen)) ShowOptionsPopup(_vm.IsOptionsPopupOpen);
+        else if (e.PropertyName == nameof(MainViewModel.IsNuclear)) ApplyNuclear(_vm.IsNuclear);
     }
+
+    // ---------------------------------------------------------------- nuclear mode
+
+    private KeyboardLock? _keyboardLock;
+
+    /// <summary>
+    /// Nuclear mode locks the window: the keyboard goes dead (volume keys aside, and Esc while the shutdown
+    /// countdown is up), closing is refused, and leaving the window brings it straight back to the front.
+    /// </summary>
+    private void ApplyNuclear(bool on)
+    {
+        if (on)
+        {
+            _keyboardLock ??= new KeyboardLock(key =>
+                key is 0xAD or 0xAE or 0xAF // volume mute / down / up
+                || (key == 0x1B && _vm.Shutdown.IsOpen)); // Esc cancels the final countdown
+            BringToFront();
+        }
+        else
+        {
+            _keyboardLock?.Dispose();
+            _keyboardLock = null;
+        }
+    }
+
+    private void OnDeactivatedWhileNuclear(object? sender, EventArgs e)
+    {
+        // Clicked another monitor, or something popped up: come right back.
+        if (_vm.IsNuclear) Dispatcher.BeginInvoke(BringToFront, DispatcherPriority.Background);
+    }
+
+    private void OnStateChangedWhileNuclear(object? sender, EventArgs e)
+    {
+        if (_vm.IsNuclear && WindowState == WindowState.Minimized) Dispatcher.BeginInvoke(BringToFront, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// To the front, with focus. Windows normally won't let a window that isn't in front take focus, so for a
+    /// moment Snag shares input with whatever is in front (the usual way round that), then lets go.
+    /// </summary>
+    private void BringToFront()
+    {
+        if (!_vm.IsNuclear) return;
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var foreground = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero || foreground == hwnd) return;
+        var theirs = GetWindowThreadProcessId(foreground, IntPtr.Zero);
+        var mine = GetCurrentThreadId();
+        var attached = theirs != 0 && theirs != mine && AttachThreadInput(mine, theirs, true);
+        try
+        {
+            Topmost = true;
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            Activate();
+        }
+        finally
+        {
+            if (attached) AttachThreadInput(mine, theirs, false);
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, IntPtr processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint attach, uint attachTo, bool on);
 
     // ---------------------------------------------------------------- Snag's dialogs (see Dialogs.cs)
 
@@ -313,6 +397,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Nuclear mode: no keyboard (the lock already swallows keys; this catches anything that slips past it).
+        if (_vm.IsNuclear)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_vm.IsOptionsPopupOpen)
         {
             // Esc closes the pop-up, unless it's closing a drop-down list inside it.
@@ -370,6 +461,13 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        if (_vm.IsNuclear)
+        {
+            // Alt+F4, the taskbar's Close, anything: no. (The shutdown at the end turns nuclear mode off first.)
+            e.Cancel = true;
+            BringToFront();
+            return;
+        }
         if (_dialogFrame is not null)
         {
             // A dialog is waiting for an answer; that comes first.

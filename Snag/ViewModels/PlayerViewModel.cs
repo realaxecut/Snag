@@ -147,13 +147,13 @@ public sealed class PlayerViewModel : ObservableObject
         };
 
         TogglePlayCommand = new RelayCommand(TogglePlay, () => Items.Count > 0);
-        NextCommand = new RelayCommand(Next, () => Current is not null && Items.Count > 0);
-        PreviousCommand = new RelayCommand(Previous, () => Current is not null);
+        NextCommand = new RelayCommand(Next, () => Current is not null && Items.Count > 0 && !IsNuclear);
+        PreviousCommand = new RelayCommand(Previous, () => Current is not null && !IsNuclear);
         ToggleMuteCommand = new RelayCommand(() => IsMuted = !IsMuted);
-        ToggleShuffleCommand = new RelayCommand(() => Shuffle = !Shuffle);
-        CycleRepeatCommand = new RelayCommand(CycleRepeat);
+        ToggleShuffleCommand = new RelayCommand(() => Shuffle = !Shuffle, () => !IsNuclear);
+        CycleRepeatCommand = new RelayCommand(CycleRepeat, () => !IsNuclear);
         ReplayCommand = new RelayCommand(PlayFromStart, () => Items.Count > 0);
-        ClearCommand = new RelayCommand(Clear, () => Items.Count > 0);
+        ClearCommand = new RelayCommand(Clear, () => Items.Count > 0 && !IsNuclear);
     }
 
     public ObservableCollection<PlaylistItem> Items { get; } = [];
@@ -268,6 +268,51 @@ public sealed class PlayerViewModel : ObservableObject
         RepeatMode.One => "Repeat: this item (R)",
         _ => "Repeat: off (R)",
     };
+
+    // ---------------------------------------------------------------- nuclear mode
+
+    private RepeatMode _repeatBeforeNuclear;
+
+    /// <summary>
+    /// Nuclear mode: this one video plays full screen and there's no leaving it (no next, previous, repeat or
+    /// leaving full screen; MainWindow locks the keyboard). When it ends, <see cref="NuclearFinished"/> starts a
+    /// 10-second shutdown countdown; cancelling that is the way out. If it can't play, nuclear mode just ends.
+    /// </summary>
+    public PlaylistItem? NuclearItem
+    {
+        get;
+        private set
+        {
+            if (!Set(ref field, value)) return;
+            OnPropertyChanged(nameof(IsNuclear));
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public bool IsNuclear => NuclearItem is not null;
+
+    /// <summary>The nuclear video played to the end.</summary>
+    public event Action? NuclearFinished;
+
+    /// <summary>The nuclear video couldn't play (the message says why): nuclear mode is over, nothing shuts down.</summary>
+    public event Action<string>? NuclearFailed;
+
+    public void StartNuclear(PlaylistItem item)
+    {
+        if (IsNuclear || !Items.Contains(item)) return;
+        _repeatBeforeNuclear = Repeat;
+        ShutdownWhenDone = false;
+        Repeat = RepeatMode.Off; // a looping video would never end
+        NuclearItem = item;
+        PlayItem(item, rememberPrevious: true);
+    }
+
+    public void EndNuclear()
+    {
+        if (!IsNuclear) return;
+        NuclearItem = null;
+        Repeat = _repeatBeforeNuclear;
+    }
 
     /// <summary>Off at every launch on purpose: shutting the PC down must be a fresh choice.</summary>
     public bool ShutdownWhenDone
@@ -397,7 +442,11 @@ public sealed class PlayerViewModel : ObservableObject
         if (await item.LoadArtworkAsync() && Items.Contains(item)) _changed(); // remembered with the playlist
     }
 
-    public void PlayItem(PlaylistItem item) => PlayItem(item, rememberPrevious: true);
+    public void PlayItem(PlaylistItem item)
+    {
+        if (IsNuclear && item != NuclearItem) return; // nothing else plays until it's over
+        PlayItem(item, rememberPrevious: true);
+    }
 
     private void PlayItem(PlaylistItem item, bool rememberPrevious)
     {
@@ -427,6 +476,7 @@ public sealed class PlayerViewModel : ObservableObject
 
     public void TogglePlay()
     {
+        if (IsNuclear && IsFinished) return; // it's over: the shutdown countdown has the floor
         if (Current is null || IsFinished)
         {
             PlayFromStart();
@@ -447,6 +497,11 @@ public sealed class PlayerViewModel : ObservableObject
     /// <summary>Starts the playlist over: the first item, or a random one with shuffle on.</summary>
     public void PlayFromStart()
     {
+        if (IsNuclear)
+        {
+            if (NuclearItem is { } nuclear) PlayItem(nuclear, rememberPrevious: false);
+            return;
+        }
         _playedThisRound.Clear();
         var first = Shuffle && Items.Count > 0 ? Items[_random.Next(Items.Count)] : Items.FirstOrDefault();
         if (first is not null) PlayItem(first);
@@ -454,12 +509,13 @@ public sealed class PlayerViewModel : ObservableObject
 
     public void Next()
     {
+        if (IsNuclear) return;
         if (NextItem(wrap: Repeat != RepeatMode.Off) is { } next) PlayItem(next);
     }
 
     public void Previous()
     {
-        if (Current is null || Host is null) return;
+        if (Current is null || Host is null || IsNuclear) return;
         if (Host.Position > TimeSpan.FromSeconds(3))
         {
             Host.Position = TimeSpan.Zero;
@@ -481,7 +537,12 @@ public sealed class PlayerViewModel : ObservableObject
         else Host.Position = TimeSpan.Zero;
     }
 
-    public void CycleRepeat() => Repeat = Repeat switch
+    public void CycleRepeat()
+    {
+        if (!IsNuclear) Repeat = NextRepeat();
+    }
+
+    private RepeatMode NextRepeat() => Repeat switch
     {
         RepeatMode.Off => RepeatMode.All,
         RepeatMode.All => RepeatMode.One,
@@ -493,6 +554,15 @@ public sealed class PlayerViewModel : ObservableObject
     public void OnMediaEnded()
     {
         _consecutiveFailures = 0;
+        if (IsNuclear)
+        {
+            // Made it to the end. No next item: the 10-second shutdown countdown takes over.
+            IsPlaying = false;
+            Host?.Stop();
+            IsFinished = true;
+            NuclearFinished?.Invoke();
+            return;
+        }
         if (Repeat == RepeatMode.One && Current is not null)
         {
             Host?.Restart();
@@ -504,6 +574,13 @@ public sealed class PlayerViewModel : ObservableObject
     public void OnMediaFailed(string message)
     {
         if (Current is { } item) item.Error = message;
+        if (IsNuclear)
+        {
+            // A video that can't play mustn't trap anyone (or shut the PC down): nuclear mode just ends.
+            IsPlaying = false;
+            NuclearFailed?.Invoke(message);
+            return;
+        }
         // If every item fails, stop instead of looping through broken files forever.
         if (++_consecutiveFailures >= Math.Max(1, Items.Count))
         {
@@ -565,6 +642,7 @@ public sealed class PlayerViewModel : ObservableObject
 
     public void Remove(PlaylistItem item)
     {
+        if (item == NuclearItem) return;
         if (item == Current)
         {
             Host?.Close();
@@ -583,6 +661,7 @@ public sealed class PlayerViewModel : ObservableObject
 
     public void Clear()
     {
+        if (IsNuclear) return;
         Host?.Close();
         IsPlaying = false;
         IsFinished = false;

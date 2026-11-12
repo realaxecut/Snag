@@ -71,10 +71,27 @@ public sealed class MainViewModel : ObservableObject
             Repeat = Enum.TryParse<RepeatMode>(_settings.Repeat, out var repeat) ? repeat : RepeatMode.Off,
         };
         Player.PlaylistFinished += OnPlaylistFinished;
+        Player.NuclearFailed += message =>
+        {
+            EndNuclear();
+            ShowToast($"Nuclear mode ended: the video couldn't play. {message}");
+        };
+        Player.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PlayerViewModel.IsNuclear)) OnPropertyChanged(nameof(IsNuclear));
+        };
         Shutdown = new ShutdownViewModel(() => ActiveCount, PrepareForShutdown, ShowToast);
+        Player.NuclearFinished += () => Shutdown.Begin(NuclearShutdownSeconds, "Video finished");
         Shutdown.Canceled += () =>
         {
             Player.ShutdownWhenDone = false;
+            if (Player.IsNuclear)
+            {
+                // The way out of nuclear mode: watch to the end, then cancel the shutdown.
+                EndNuclear();
+                ShowToast("You made it. Nuclear mode is off.");
+                return;
+            }
             ShowToast("Shutdown canceled");
         };
 
@@ -262,6 +279,12 @@ public sealed class MainViewModel : ObservableObject
         get;
         set
         {
+            if (!value && Player.IsNuclear)
+            {
+                // No leaving full screen in nuclear mode; tell bindings it's still on.
+                OnPropertyChanged();
+                return;
+            }
             if (!Set(ref field, value)) return;
             if (value) Page = AppPage.Player;
             OnPropertyChanged(nameof(FullscreenGlyph));
@@ -804,6 +827,40 @@ public sealed class MainViewModel : ObservableObject
             if (Set(ref field, value)) HistoryView.Refresh();
         }
     } = "";
+
+    // ================================================================ nuclear mode
+
+    public const int NuclearShutdownSeconds = 10;
+
+    /// <summary>
+    /// Nuclear mode is on: one video, locked full screen, keyboard off (MainWindow), until it ends and the
+    /// shutdown that follows is cancelled.
+    /// </summary>
+    public bool IsNuclear => Player.IsNuclear;
+
+    /// <summary>Asks first (it's meant to be hard to get out of), then locks <paramref name="item"/> in full screen.</summary>
+    public void StartNuclear(PlaylistItem? item)
+    {
+        if (item is null || Player.IsNuclear || !Player.Items.Contains(item)) return;
+        if (!Dialogs.Confirm("Go nuclear?",
+                $"\"{item.Title}\" plays full screen and there's no leaving until it ends. Leaving full screen, the keyboard, " +
+                $"Alt+F4 and switching apps all stop working; you can still seek, pause and change the volume with the mouse.\n\n" +
+                $"When it ends, your PC shuts down in {NuclearShutdownSeconds} seconds unless you click Cancel. That's the way out.",
+                "Go nuclear", "Not now", DialogTone.Danger, Dialogs.WarningGlyph))
+            return;
+        Log.Info("Nuclear mode on");
+        Page = AppPage.Player;
+        IsFullscreen = true;
+        Player.StartNuclear(item);
+    }
+
+    private void EndNuclear()
+    {
+        if (!Player.IsNuclear) return;
+        Player.EndNuclear();
+        IsFullscreen = false;
+        Log.Info("Nuclear mode off");
+    }
 
     // ================================================================ Browser tab
 
@@ -1836,6 +1893,8 @@ public sealed class MainViewModel : ObservableObject
     private void PrepareForShutdown()
     {
         Player.ShutdownWhenDone = false;
+        // Nuclear mode would stop Snag from closing, and so hold up the shutdown it ends with.
+        EndNuclear();
         if (App.DryRunShutdown) return;
         _exiting = true;
         foreach (var item in Queue) item.Cts?.Cancel();
